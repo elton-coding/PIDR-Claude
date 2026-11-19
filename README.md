@@ -143,7 +143,8 @@ PIDR_DATASET=sr python -m scripts.train.train_pidr
 >
 > 另外，2026-06 数据集重新导出后 `CSI_Gain` 从 `10*log10|h|²` 变为 `10*log10|h|`，
 > `diffusion.py` 的增益投影相应从 `10*log10(re²+im²)` 改为 `5*log10(re²+im²)`，两者等价，旧权重可直接使用。
-> 但论文中的 MSE 是旧尺度：用当前数据评估得到的 MSE 需乘以 4 才能与论文比较。
+> 论文按 `10*log10|h|²` 定义增益（式 (2)），因此用当前数据评估得到的 MSE 需乘以 4 才能与论文比较；
+> NMSE、PSNR、SSIM 不受影响。
 
 ## 编译论文
 

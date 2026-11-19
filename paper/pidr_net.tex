@@ -117,7 +117,7 @@ Let $\vect{t}\in\mathcal{C}_{\mathrm t}$ denote the MA's position. We suppress t
 \end{equation}
 where $h^{\mathrm{re}}(\vect{t})$ and $h^{\mathrm{im}}(\vect{t})$ denote its real and imaginary parts, respectively. The corresponding channel amplitude in decibels (dB) is
 \begin{equation}
-    g(\vect{t})=10\log_{10}\!\left(\sqrt{\big(h^{\mathrm{re}}(\vect{t})\big)^2+\big(h^{\mathrm{im}}(\vect{t})\big)^2}\right),
+    g(\vect{t})=10\log_{10}\!\left(\big(h^{\mathrm{re}}(\vect{t})\big)^2+\big(h^{\mathrm{im}}(\vect{t})\big)^2\right),
     \label{eq:continuous_gain_t}
 \end{equation}
 
@@ -379,7 +379,7 @@ Here, $\operatorname{clip}_{[-1,1]}(\cdot)$ denotes entrywise clipping to the in
 
 The next operation in the guided branch recomputes the amplitude channel from the real and imaginary channels at each grid location $(u,v)$:
 \begin{equation}
-    \widehat{X}^{\mathrm g}_{0,t}(u,v)=10\log_{10}\!\left(\sqrt{\big(\widehat{X}^{\mathrm{re}}_{0,t}(u,v)\big)^2+\big(\widehat{X}^{\mathrm{im}}_{0,t}(u,v)\big)^2}\right),
+    \widehat{X}^{\mathrm g}_{0,t}(u,v)=10\log_{10}\!\left(\big(\widehat{X}^{\mathrm{re}}_{0,t}(u,v)\big)^2+\big(\widehat{X}^{\mathrm{im}}_{0,t}(u,v)\big)^2\right),
     \label{eq:physics_projection}
 \end{equation}
 where $\widehat{X}^{\mathrm{re}}_{0,t}(u,v)$ and $\widehat{X}^{\mathrm{im}}_{0,t}(u,v)$ are the components after inverse normalization. The corrected three-channel tensor is mapped back to normalized space by \eqref{eq:normalization}, yielding $\widehat{\mat{x}}^{\mathrm{phy}}_{0,t}$. To restore measured entries, define the observation consistency operator
