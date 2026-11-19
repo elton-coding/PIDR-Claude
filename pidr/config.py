@@ -1,28 +1,102 @@
-"""Project-wide configuration with grouped sections and compatibility aliases."""
+"""Project-wide configuration with grouped sections and compatibility aliases.
+
+Dataset presets
+---------------
+The dataset-dependent settings (data file, grid size, training hyperparameters and
+the default checkpoint set) are chosen with the ``PIDR_DATASET`` environment variable
+when this module is imported:
+
+    PowerShell:  $env:PIDR_DATASET = "sr"; python -m scripts.train.train_pidr
+    bash:        PIDR_DATASET=sr python -m scripts.train.train_pidr
+
+``sr`` (Sionna RT) and ``fd`` (field response) use the paper's hyperparameter table;
+``el`` (EM simulation, default) keeps the settings of the last EL experiment.
+"""
 
 import os
 
 import torch
 
 
+DATASET_PRESETS = {
+    # Paper settings (Table "Main experimental hyperparameters").
+    "sr": {
+        "data_path": "./data/sr.mat",
+        "img_height": 32,
+        "img_width": 32,
+        "train_sample_count": 9000,
+        "batch_size": 32,
+        "learning_rate": 2e-4,
+        "num_epochs": 1000,
+        "force_rebuild_cache": False,
+        "diffusion_ckpt": "physics_model_best_nop_sr.pth",
+        "pinn_ckpt": "cnn_pinn_best_sr.pth",
+        "pidr_diffusion_ckpt": "pidr_diffusion_0.8sr.pth",
+        "pidr_refiner_ckpt": "pidr_refiner_0.8sr.pth",
+        "cache_tag": "0.8sr",
+        "legacy_tag": "sr",
+    },
+    # Same hyperparameters as SR; field.mat is also 32x32 with 10000 maps.
+    "fd": {
+        "data_path": "./data/field.mat",
+        "img_height": 32,
+        "img_width": 32,
+        "train_sample_count": 9000,
+        "batch_size": 32,
+        "learning_rate": 2e-4,
+        "num_epochs": 1000,
+        "force_rebuild_cache": False,
+        "diffusion_ckpt": "physics_model_best_nop_fd.pth",
+        "pinn_ckpt": "cnn_pinn_best_fd.pth",
+        "pidr_diffusion_ckpt": "pidr_diffusion_0.8fd.pth",
+        "pidr_refiner_ckpt": "pidr_refiner_0.8fd.pth",
+        "cache_tag": "0.8fd",
+        "legacy_tag": "fd",
+    },
+    # EM simulation data: 21x41 grid, 961 maps (864 for training).
+    "el": {
+        "data_path": "./data/el.mat",
+        "img_height": 21,
+        "img_width": 41,
+        "train_sample_count": 864,
+        "batch_size": 32,
+        "learning_rate": 2e-5,
+        "num_epochs": 30000,
+        "force_rebuild_cache": True,
+        "diffusion_ckpt": "diffusion_el.pth",
+        "pinn_ckpt": "cnn_pinn_best_el.pth",
+        "pidr_diffusion_ckpt": "pidr_diffusion_el (2).pth",
+        "pidr_refiner_ckpt": "pidr_refiner_eltest.pth",
+        "cache_tag": "el",
+        "legacy_tag": "el",
+    },
+}
+
+DATASET = os.environ.get("PIDR_DATASET", "el").strip().lower()
+if DATASET not in DATASET_PRESETS:
+    raise ValueError(f"PIDR_DATASET must be one of {sorted(DATASET_PRESETS)}, got {DATASET!r}")
+_PRESET = DATASET_PRESETS[DATASET]
+_LEGACY = _PRESET["legacy_tag"]
+
+
 class _PathsConfig:
-    DATA_PATH = "./data/el.mat"
+    DATA_PATH = _PRESET["data_path"]
     LOG_DIR = "./runs/diffusion"
 
     CHECKPOINT_DIR = "./checkpoints"
     CACHE_DIR = "./cache"
 
-    DIFFUSION_CHECKPOINT = os.path.join(CHECKPOINT_DIR, "diffusion_el.pth")
-    PINN_CHECKPOINT = os.path.join(CHECKPOINT_DIR, "cnn_pinn_best_el.pth")
-    PIDR_DIFFUSION_CHECKPOINT = os.path.join(CHECKPOINT_DIR, "pidr_diffusion_el (2).pth")
-    PIDR_REFINER_CHECKPOINT = os.path.join(CHECKPOINT_DIR, "pidr_refiner_eltest.pth")
-    PIDR_CACHE_TRAIN = os.path.join(CACHE_DIR, "pidr_diffusion_recon_train_for_refiner_el.pt")
-    PIDR_CACHE_TEST = os.path.join(CACHE_DIR, "pidr_diffusion_recon_test_for_refiner_el.pt")
+    DIFFUSION_CHECKPOINT = os.path.join(CHECKPOINT_DIR, _PRESET["diffusion_ckpt"])
+    PINN_CHECKPOINT = os.path.join(CHECKPOINT_DIR, _PRESET["pinn_ckpt"])
+    PIDR_DIFFUSION_CHECKPOINT = os.path.join(CHECKPOINT_DIR, _PRESET["pidr_diffusion_ckpt"])
+    PIDR_REFINER_CHECKPOINT = os.path.join(CHECKPOINT_DIR, _PRESET["pidr_refiner_ckpt"])
+    PIDR_CACHE_TRAIN = os.path.join(CACHE_DIR, f"pidr_diffusion_recon_train_for_refiner_{_PRESET['cache_tag']}.pt")
+    PIDR_CACHE_TEST = os.path.join(CACHE_DIR, f"pidr_diffusion_recon_test_for_refiner_{_PRESET['cache_tag']}.pt")
 
-    LEGACY_PIDR_DIFFUSION_CHECKPOINT = os.path.join(CHECKPOINT_DIR, "cascade_diffusion_transformer_for_pinn_best_el.pth")
-    LEGACY_PIDR_REFINER_CHECKPOINT = os.path.join(CHECKPOINT_DIR, "cascade_pinn_best_el.pth")
-    LEGACY_PIDR_CACHE_TRAIN = os.path.join(CACHE_DIR, "cascade_diffusion_transformer_recon_train_for_pinn_el.pt")
-    LEGACY_PIDR_CACHE_TEST = os.path.join(CACHE_DIR, "cascade_diffusion_transformer_recon_test_for_pinn_el.pt")
+    LEGACY_PIDR_DIFFUSION_CHECKPOINT = os.path.join(CHECKPOINT_DIR, f"cascade_diffusion_transformer_for_pinn_best_{_LEGACY}.pth")
+    LEGACY_PIDR_REFINER_CHECKPOINT = os.path.join(CHECKPOINT_DIR, f"cascade_pinn_best_{_LEGACY}.pth")
+    LEGACY_PIDR_CACHE_TRAIN = os.path.join(CACHE_DIR, f"cascade_diffusion_transformer_recon_train_for_pinn_{_LEGACY}.pt")
+    LEGACY_PIDR_CACHE_TEST = os.path.join(CACHE_DIR, f"cascade_diffusion_transformer_recon_test_for_pinn_{_LEGACY}.pt")
 
     CASCADE_DIFFUSION_CHECKPOINT = PIDR_DIFFUSION_CHECKPOINT
     CASCADE_PINN_CHECKPOINT = PIDR_REFINER_CHECKPOINT
@@ -35,12 +109,12 @@ class _RuntimeConfig:
 
 
 class _DataConfig:
-    IMG_HEIGHT = 21
-    IMG_WIDTH = 41
+    IMG_HEIGHT = _PRESET["img_height"]
+    IMG_WIDTH = _PRESET["img_width"]
     IMG_CHANNELS = 3
 
     DATA_SPLIT_RATIO = 0.90
-    TRAIN_SAMPLE_COUNT = 864
+    TRAIN_SAMPLE_COUNT = _PRESET["train_sample_count"]
     MASK_RATIO = 0.8
     EVAL_MASK_SEED = 0
 
@@ -61,9 +135,9 @@ class _ModelConfig:
 
 
 class _TrainingConfig:
-    BATCH_SIZE = 32
-    LEARNING_RATE = 2e-5
-    NUM_EPOCHS = 30000
+    BATCH_SIZE = _PRESET["batch_size"]
+    LEARNING_RATE = _PRESET["learning_rate"]
+    NUM_EPOCHS = _PRESET["num_epochs"]
     GRAD_CLIP_NORM = 1.0
 
 
@@ -91,7 +165,7 @@ class _PIDRConfig:
 
     SAMPLE_STRIDE = 1
     PINN_TRAIN_MASK_SEED = 12345
-    FORCE_REBUILD_CACHE = True
+    FORCE_REBUILD_CACHE = _PRESET["force_rebuild_cache"]
 
     DIFFUSION_CHECKPOINT = _PathsConfig.PIDR_DIFFUSION_CHECKPOINT
     REFINER_CHECKPOINT = _PathsConfig.PIDR_REFINER_CHECKPOINT
@@ -279,6 +353,8 @@ class _BenchmarkConfig:
 
 class Config:
     """Grouped project configuration with flat aliases for legacy callers."""
+
+    DATASET = DATASET
 
     PATHS = _PathsConfig
     RUNTIME = _RuntimeConfig

@@ -102,9 +102,32 @@ python -m scripts.train.train_pidr
 
 最终模型（用于 MA 实验）的完整推理/评估命令见 [docs/run_commands.md](docs/run_commands.md)。
 
+## 数据集预设（`PIDR_DATASET`）
+
+与数据集相关的设置（数据文件、网格尺寸、训练超参数、默认权重组合）由环境变量
+`PIDR_DATASET` 在导入 `pidr/config.py` 时选择，取值 `sr` / `fd` / `el`（默认 `el`）：
+
+```powershell
+$env:PIDR_DATASET = "sr"; python -m scripts.train.train_pidr
+```
+
+```bash
+PIDR_DATASET=sr python -m scripts.train.train_pidr
+```
+
+| 预设 | 数据 | 网格 | 训练样本 | lr / epochs | 默认权重（Diffusion / PINN / PIDR 扩散 + 细化） |
+|---|---|---|---|---|---|
+| `sr` | `data/sr.mat` | 32×32 | 9000 | 2e-4 / 1000 | `physics_model_best_nop_sr` / `cnn_pinn_best_sr` / `pidr_{diffusion,refiner}_0.8sr` |
+| `fd` | `data/field.mat` | 32×32 | 9000 | 2e-4 / 1000 | `physics_model_best_nop_fd` / `cnn_pinn_best_fd` / `pidr_{diffusion,refiner}_0.8fd` |
+| `el` | `data/el.mat` | 21×41 | 864 | 2e-5 / 30000 | `diffusion_el` / `cnn_pinn_best_el` / `pidr_diffusion_el (2)` + `pidr_refiner_eltest` |
+
+`sr`、`fd` 使用论文超参数表；`el` 保留最后一次 EL 实验的设置（与整理前的默认值完全相同）。
+带有独立命令行参数的脚本（`evaluate_pidr`、`generate_channel_maps`、`train_pidr_ssim_target`）
+以命令行参数为准，见 [docs/run_commands.md](docs/run_commands.md)。
+
 ## 复现论文的训练设置
 
-论文中的超参数（Table: Main experimental hyperparameters）对应 **SR 数据集**：
+论文中的超参数（Table: Main experimental hyperparameters）对应 **SR 数据集**（即 `PIDR_DATASET=sr`）：
 
 | 项目 | 值 |
 |---|---|
@@ -115,9 +138,9 @@ python -m scripts.train.train_pidr
 | 训练 | batch 32，AdamW，lr 2e-4，1000 epochs，缺失区域权重 3.0 |
 | PINN | base channels 32 |
 
-> **注意**：`pidr/config.py` 当前的默认值是最后一次 EL 实验的设置（`./data/el.mat`、21×41、
-> `TRAIN_SAMPLE_COUNT=864`、`lr=2e-5` 等）。复现 SR 结果前需要按上表修改 `_PathsConfig.DATA_PATH`、
-> `_DataConfig`、`_TrainingConfig` 中的对应项。
+> **注意**：默认预设是 `el`，复现 SR 结果前务必设置 `PIDR_DATASET=sr`。
+> `checkpoints/pidr_diffusion_fd.pth` 是 32 通道模型（base channels 32），不在 `fd` 预设中，
+> 只能通过 `--diffusion-base-channels 32` 在最终模型命令里使用。
 >
 > 另外，旧版 SR 权重训练时 `diffusion.py` 的增益投影为 `10*log10(re²+im²)`（功率形式），
 > 当前代码为 `5*log10(re²+im²)`（与数据中 `CSI_Gain = 10*log10|h|` 一致）。
