@@ -153,8 +153,13 @@ checkpoints/
 复现：
 
 ```bash
-PIDR_DATASET=sr python -m scripts.train.train_refiner_ablation --variants A B C --seed 0
-PIDR_DATASET=sr python -m scripts.eval.eval_refiner_ablation
+# 变体已改名：A_full = RAD，B_no_prior = NP_direct，C_plain = PLAIN（输出目录同名）
+PIDR_DATASET=sr python -m scripts.train.train_refiner_ablation --variants RAD NP_direct PLAIN --seeds 0
+PIDR_DATASET=sr python -m scripts.eval.eval_refiner_ablation --variants RAD NP_direct PLAIN --n 50
 ```
 
 权重：`checkpoints/sr/ablation_refiner/{A_full,B_no_prior,C_plain}/refiner.pth`，训练日志 `checkpoints/sr/ablation_refiner/train.log`。
+
+后续：refiner 的物理模块已重新设计为逐图的场响应 LMMSE 层，在 SR/FD/EL 上都有明显正收益
+（论文协议下比无物理模块的同一网络好 2.4–12 dB），见 [physics_refiner.md](physics_refiner.md)；
+权重在 `checkpoints/<ds>/refiner_fr/`。

@@ -33,7 +33,7 @@ from scipy.io import loadmat, savemat
 from skimage.metrics import structural_similarity as ssim
 from tqdm import tqdm
 
-from pidr.models.pinn_refiner import PINNCSIReconstructor
+from pidr.models.pinn_refiner import build_refiner_from_state_dict
 from pidr.config import Config
 from pidr.diffusion import DiffusionManager
 from pidr.models.diffusion_unet import CSIDiffusionPhysicsModel
@@ -475,8 +475,7 @@ def load_models(diffusion_ckpt: str, refiner_ckpt: str, device: str, diffusion_b
     diffusion_model = CSIDiffusionPhysicsModel().to(device).eval()
     diffusion_model.load_state_dict(load_plain_or_wrapped_state_dict(diffusion_ckpt, device))
 
-    refiner_model = PINNCSIReconstructor().to(device).eval()
-    refiner_model.load_state_dict(load_plain_or_wrapped_state_dict(refiner_ckpt, device))
+    refiner_model = build_refiner_from_state_dict(load_plain_or_wrapped_state_dict(refiner_ckpt, device)).to(device).eval()
     return diffusion_model, refiner_model
 
 

@@ -17,12 +17,18 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import torch
 from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 
+from pidr.models.field_response import (
+    apply_field_response,
+    calibrate_field_response,
+    configure_field_response,
+    estimate_global_psd,
+)
 from pidr.models.pinn_refiner import PINNCSIReconstructor
 from pidr.config import Config
 from pidr.data import CSIGridDataset
@@ -137,9 +143,10 @@ def sample_physics_guided(
 class DiffusionReconDataset(Dataset):
     """Wrap a base dataset and provide cached diffusion reconstructions as extra input."""
 
-    def __init__(self, base: Dataset, diffusion_recon: torch.Tensor):
+    def __init__(self, base: Dataset, diffusion_recon: torch.Tensor, physics: Optional[torch.Tensor] = None):
         self.base = base
         self.diffusion_recon = diffusion_recon
+        self.physics = physics
 
         if len(self.base) != int(self.diffusion_recon.shape[0]):
             raise ValueError(
@@ -152,6 +159,8 @@ class DiffusionReconDataset(Dataset):
     def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:
         item = self.base[idx]
         item["diffusion_recon"] = self.diffusion_recon[idx]
+        if self.physics is not None:
+            item["physics"] = self.physics[idx]
         return item
 
 
@@ -311,6 +320,50 @@ def train_diffusion_stage(
             print(f"[PIDR-Diffusion] New best saved -> {paths.diffusion_ckpt} (val_missing_mse={best_val:.6f})")
 
 
+class TensorBatches:
+    """Mini-batches sliced from tensors materialised once on the device (fast replacement of a DataLoader
+    over a dataset whose items are deterministic)."""
+
+    def __init__(self, dataset: Dataset, batch_size: int, shuffle: bool, device: str):
+        first = dataset[0]
+        self.data = {k: torch.stack([dataset[i][k] for i in range(len(dataset))]).to(device) for k in first}
+        self.n = len(dataset)
+        self.batch_size = batch_size
+        self.shuffle = shuffle
+
+    def __len__(self) -> int:
+        return (self.n + self.batch_size - 1) // self.batch_size
+
+    def __iter__(self):
+        device = next(iter(self.data.values())).device
+        order = torch.randperm(self.n, device=device) if self.shuffle else torch.arange(self.n, device=device)
+        for s in range(0, self.n, self.batch_size):
+            idx = order[s:s + self.batch_size]
+            yield {k: v[idx] for k, v in self.data.items()}
+
+
+def _stack_field(dataset: Dataset, key: str) -> torch.Tensor:
+    return torch.stack([dataset[i][key] for i in range(len(dataset))])
+
+
+def prepare_field_response(pinn, train_dataset, test_dataset, diff_train, diff_test):
+    """Calibrate the field-response layer on the training split and precompute its outputs."""
+    layer = pinn.prior
+    gt_train = _stack_field(train_dataset, "gt_csi")
+    mask_train = _stack_field(train_dataset, "mask")
+    mask_test = _stack_field(test_dataset, "mask")
+    lo = torch.tensor(train_dataset.global_min, dtype=torch.float64).view(1, 3, 1, 1)
+    hi = torch.tensor(train_dataset.global_max, dtype=torch.float64).view(1, 3, 1, 1)
+    phys = (gt_train.double() + 1) / 2 * (hi - lo) + lo
+    psd = estimate_global_psd(torch.complex(phys[:, 1], phys[:, 2]), Config.IMG_HEIGHT, Config.IMG_WIDTH)
+    configure_field_response(layer, train_dataset.global_min, train_dataset.global_max, global_psd=psd)
+    calib = calibrate_field_response(layer, diff_train, mask_train, gt_train)
+    print(f"[PIDR-Refiner] field-response calibration (train split): {calib}", flush=True)
+    phys_train = apply_field_response(layer, diff_train, mask_train)
+    phys_test = apply_field_response(layer, diff_test, mask_test)
+    return phys_train, phys_test
+
+
 def train_pinn_stage(
     *,
     device: str,
@@ -319,7 +372,17 @@ def train_pinn_stage(
     sample_stride: int,
     force_rebuild_cache: bool,
     train_mask_seed: int,
+    refiner_kwargs: Optional[Dict[str, Any]] = None,
 ) -> None:
+    """Train the refiner on cached diffusion reconstructions.
+
+    ``refiner_kwargs`` selects the refiner variant (default ``Config.PIDR.REFINER_KWARGS``). With the
+    field-response physics prior, the layer is first calibrated on the training split (dataset
+    wavenumber spectrum + LMMSE hyper-parameters) and its outputs are precomputed once, since the
+    layer has no trainable weights.
+    """
+    if refiner_kwargs is None:
+        refiner_kwargs = dict(Config.PIDR.REFINER_KWARGS)
     diffusion_source_ckpt = _resolve_existing_path(
         paths.diffusion_ckpt,
         Config.PIDR.LEGACY_DIFFUSION_CHECKPOINT,
@@ -372,13 +435,19 @@ def train_pinn_stage(
         force_rebuild=force_rebuild_cache,
     )
 
-    train_ds = DiffusionReconDataset(train_dataset, diff_train)
-    test_ds = DiffusionReconDataset(test_dataset, diff_test)
+    pinn = PINNCSIReconstructor(height=Config.IMG_HEIGHT, width=Config.IMG_WIDTH, **refiner_kwargs).to(device)
+    print(f"[PIDR-Refiner] variant: {refiner_kwargs}, parameters={sum(p.numel() for p in pinn.parameters())}", flush=True)
+    phys_train = phys_test = None
+    if pinn.prior_type == "field_response":
+        phys_train, phys_test = prepare_field_response(pinn, train_dataset, test_dataset, diff_train, diff_test)
 
-    train_loader = DataLoader(train_ds, batch_size=Config.BATCH_SIZE, shuffle=True)
-    test_loader = DataLoader(test_ds, batch_size=Config.BATCH_SIZE, shuffle=False)
+    train_ds = DiffusionReconDataset(train_dataset, diff_train, phys_train)
+    test_ds = DiffusionReconDataset(test_dataset, diff_test, phys_test)
 
-    pinn = PINNCSIReconstructor().to(device)
+    # Masks are fixed per sample (mask seeds), so the whole split is materialised once on the device.
+    train_loader = TensorBatches(train_ds, Config.BATCH_SIZE, shuffle=True, device=device)
+    test_loader = TensorBatches(test_ds, Config.BATCH_SIZE, shuffle=False, device=device)
+
     optimizer = torch.optim.AdamW(pinn.parameters(), lr=Config.LEARNING_RATE)
 
     best_val = float("inf")
@@ -395,8 +464,9 @@ def train_pinn_stage(
             sparse = batch["sparse_csi"].to(device)
             mask = batch["mask"].to(device)
             diff_recon = batch["diffusion_recon"].to(device)
+            physics = batch["physics"].to(device) if "physics" in batch else None
 
-            pred = pinn(diff_recon, mask)
+            pred = pinn(diff_recon, mask, physics=physics)
             # Keep observed positions exact.
             pred = pred * (1 - mask) + sparse * mask
 
@@ -421,8 +491,9 @@ def train_pinn_stage(
                 sparse = batch["sparse_csi"].to(device)
                 mask = batch["mask"].to(device)
                 diff_recon = batch["diffusion_recon"].to(device)
+                physics = batch["physics"].to(device) if "physics" in batch else None
 
-                pred = pinn(diff_recon, mask)
+                pred = pinn(diff_recon, mask, physics=physics)
                 pred = pred * (1 - mask) + sparse * mask
                 val_metric += float(missing_region_mse(pred, gt, mask).item())
 

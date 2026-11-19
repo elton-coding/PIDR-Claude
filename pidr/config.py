@@ -181,6 +181,10 @@ class _PIDRConfig:
 
     SAMPLE_STRIDE = 1
     PINN_TRAIN_MASK_SEED = 12345
+    # Refiner variant (see pidr.models.pinn_refiner.PINNCSIReconstructor and docs/physics_refiner.md):
+    # field-response LMMSE physics branch + coordinates, residual on the physics estimate.
+    # The paper (v13) refiner was dict(prior="radial", use_coords=True, residual="none").
+    REFINER_KWARGS = dict(prior="field_response", use_coords=True, residual="physics")
     FORCE_REBUILD_CACHE = _PRESET["force_rebuild_cache"]
 
     # scripts/train/train_pidr.py writes here (never into checkpoints/).

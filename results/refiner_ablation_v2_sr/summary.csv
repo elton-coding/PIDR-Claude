@@ -1,0 +1,31 @@
+evaluation,method,train_seeds,MSE,NMSE_dB,PSNR_dB,SSIM,MSE_std_train_seeds,NMSE_dB_std_train_seeds,PSNR_dB_std_train_seeds,SSIM_std_train_seeds
+cache (all 1000 test maps),Diffusion only,1,1.535296408355236,-39.92162543308408,28.326460543023934,0.9234946869501657,,,,
+cache (all 1000 test maps),Physics only,1,0.8944861253516283,-44.08411880440974,32.488953914595605,0.9662223542324125,,,,
+cache (all 1000 test maps),A_full,1,1.1604969764500856,-42.005943105199144,30.410778196086667,0.9517893152035777,,,,
+cache (all 1000 test maps),B_no_prior,1,1.085506617628038,-42.339186422225225,30.74402153749759,0.9566536392597715,,,,
+cache (all 1000 test maps),C_plain,1,1.1283777430541813,-41.989653435675,30.39448854829144,0.9540543230831301,,,,
+cache (all 1000 test maps),FR,3,0.6100860600626329,-46.56032601819214,34.96516113635618,0.9768513716533932,0.0064648761083451484,0.04821672304328211,0.048216723485844055,0.00010496337545056471
+cache (all 1000 test maps),FR_coarse,1,0.6660215522660874,-45.925423172389294,34.33025828734057,0.9752396291018627,,,,
+cache (all 1000 test maps),NP,3,0.8361201537838205,-44.11763675457927,32.52247186676811,0.9671326714689276,0.012899658429178253,0.030672812013183302,0.030672804408680008,0.00025022054333403347
+cache (all 1000 test maps),PAPER,1,1.1529540283922106,-42.095160832928364,30.499995945545166,0.9527865801258724,,,,
+cache: fraction of maps with lower MSE,FR vs A_full (seed 0),1,0.991,,,,,,,
+cache: fraction of maps with lower MSE,FR vs B_no_prior (seed 0),1,0.985,,,,,,,
+cache: fraction of maps with lower MSE,FR vs C_plain (seed 0),1,0.982,,,,,,,
+cache: fraction of maps with lower MSE,FR vs NP (seed 0),1,0.896,,,,,,,
+cache: fraction of maps with lower MSE,FR vs PAPER (seed 0),1,0.988,,,,,,,
+cache: fraction of maps with lower MSE,FR_coarse vs A_full (seed 0),1,0.972,,,,,,,
+cache: fraction of maps with lower MSE,FR_coarse vs B_no_prior (seed 0),1,0.958,,,,,,,
+cache: fraction of maps with lower MSE,FR_coarse vs C_plain (seed 0),1,0.962,,,,,,,
+cache: fraction of maps with lower MSE,FR_coarse vs NP (seed 0),1,0.792,,,,,,,
+cache: fraction of maps with lower MSE,FR_coarse vs PAPER (seed 0),1,0.971,,,,,,,
+cache: fraction of maps with lower MSE,FR vs NP (seed 1),1,0.912,,,,,,,
+cache: fraction of maps with lower MSE,FR vs NP (seed 2),1,0.884,,,,,,,
+"protocol (first 1000 test maps, 5 sampling seeds)",Diffusion only,1,1.5347229119971395,-39.94217665740145,28.347011770216994,0.9235380406368755,,,,
+"protocol (first 1000 test maps, 5 sampling seeds)",Physics only,1,0.8898530112957582,-44.08847948324951,32.493314595772546,0.9662367532671376,,,,
+"protocol (first 1000 test maps, 5 sampling seeds)",A_full,1,1.163338317335397,-42.01005262640432,30.414887736704436,0.9517458951101148,,,,
+"protocol (first 1000 test maps, 5 sampling seeds)",B_no_prior,1,1.0868057088043541,-42.34594824101318,30.75078335690544,0.9566620459034049,,,,
+"protocol (first 1000 test maps, 5 sampling seeds)",C_plain,1,1.1314107670769096,-41.98410955786248,30.388944672111677,0.9540135067104755,,,,
+"protocol (first 1000 test maps, 5 sampling seeds)",FR,3,0.6085027488463247,-46.57039279447582,34.97522790689604,0.9768606825763331,0.005755331769930532,0.053298120103974424,0.053298119907465864,0.00010756404576920389
+"protocol (first 1000 test maps, 5 sampling seeds)",FR_coarse,1,0.6606354796475731,-45.93998215294943,34.34481726967843,0.9752527150026026,,,,
+"protocol (first 1000 test maps, 5 sampling seeds)",NP,3,0.8383382065670565,-44.13383619164824,32.538671300569995,0.967091325155471,0.01270937564398454,0.02750166216116765,0.02750166217898214,0.00025606183863142654
+"protocol (first 1000 test maps, 5 sampling seeds)",PAPER,1,1.1555524246212097,-42.10008283637369,30.50491794694138,0.9527413455841274,,,,

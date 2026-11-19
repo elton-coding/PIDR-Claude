@@ -20,7 +20,7 @@ from skimage.metrics import peak_signal_noise_ratio as psnr
 from skimage.metrics import structural_similarity as ssim
 from tqdm import tqdm
 
-from pidr.models.pinn_refiner import PINNCSIReconstructor
+from pidr.models.pinn_refiner import PINNCSIReconstructor, build_refiner_from_state_dict
 from pidr.config import Config
 from pidr.data import CSIGridDataset
 from pidr.diffusion import DiffusionManager
@@ -225,8 +225,7 @@ def run_mask_strategy_benchmark(
     pidr_diffusion_model = CSIDiffusionPhysicsModel().to(device).eval()
     pidr_diffusion_model.load_state_dict(torch.load(pidr_diffusion_path, map_location=device))
 
-    pidr_refiner_model = PINNCSIReconstructor().to(device).eval()
-    pidr_refiner_model.load_state_dict(torch.load(pidr_refiner_path, map_location=device))
+    pidr_refiner_model = build_refiner_from_state_dict(torch.load(pidr_refiner_path, map_location="cpu")).to(device).eval()
 
     diffusion_mgr = DiffusionManager(device, dataset.global_min, dataset.global_max)
 

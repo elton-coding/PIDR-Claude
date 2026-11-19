@@ -19,7 +19,7 @@ from skimage.metrics import peak_signal_noise_ratio as psnr
 from skimage.metrics import structural_similarity as ssim
 from tqdm import tqdm
 
-from pidr.models.pinn_refiner import PINNCSIReconstructor
+from pidr.models.pinn_refiner import build_refiner_from_state_dict
 from pidr.config import Config
 from pidr.data import CSIGridDataset
 from pidr.diffusion import DiffusionManager
@@ -202,8 +202,7 @@ def load_pidr_experiments(
         diffusion_model = CSIDiffusionPhysicsModel().to(device).eval()
         diffusion_model.load_state_dict(torch.load(diffusion_ckpt, map_location=device))
 
-        refiner_model = PINNCSIReconstructor().to(device).eval()
-        refiner_model.load_state_dict(torch.load(refiner_ckpt, map_location=device))
+        refiner_model = build_refiner_from_state_dict(torch.load(refiner_ckpt, map_location="cpu")).to(device).eval()
 
         loaded_experiments.append(
             {

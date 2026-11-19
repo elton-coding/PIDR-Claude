@@ -28,7 +28,7 @@ from skimage.metrics import peak_signal_noise_ratio as psnr
 from skimage.metrics import structural_similarity as ssim
 from tqdm import tqdm
 
-from pidr.models.pinn_refiner import PINNCSIReconstructor
+from pidr.models.pinn_refiner import PINNCSIReconstructor, build_refiner_from_state_dict
 from pidr.config import Config
 from pidr.data import CSIGridDataset
 from pidr.diffusion import DiffusionManager
@@ -303,8 +303,7 @@ def run_benchmark() -> None:
     pidr_diff = CSIDiffusionPhysicsModel().to(device).eval()
     pidr_diff.load_state_dict(load_plain_or_wrapped_state_dict(pidr_diff_ckpt, device))
 
-    pidr_refiner = PINNCSIReconstructor().to(device).eval()
-    pidr_refiner.load_state_dict(load_plain_or_wrapped_state_dict(pidr_refiner_ckpt, device))
+    pidr_refiner = build_refiner_from_state_dict(load_plain_or_wrapped_state_dict(pidr_refiner_ckpt, device)).to(device).eval()
 
     print(
         "Benchmark settings: "
