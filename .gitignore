@@ -12,7 +12,8 @@ Thumbs.db
 
 # Datasets, weights and generated caches (large; kept locally, not in git)
 data/
-checkpoints/
+checkpoints/*
+!checkpoints/MANIFEST.csv
 cache/
 *.mat
 *.pth

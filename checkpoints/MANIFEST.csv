@@ -1,0 +1,76 @@
+path,dataset,experiment,setting,stage,base_channels,original_name,trained,md5,paper_usage,evidence
+el/baselines/diffusion.pth,el,baselines,,diffusion,64,diffusion_el.pth,2026-06-16 12:50,0bc82250c3446db64e1ca3344fabab83,not in paper (trained on current el.mat),el preset default
+el/baselines/pinn.pth,el,baselines,,pinn,32,cnn_pinn_best_el.pth,2026-06-16 06:43,ecfccfc309608c6890afdbd837a69545,not in paper (trained on current el.mat),el preset default
+el/final/diffusion.pth,el,final,,diffusion,64,pidr_diffusion_0.8el.pth,2026-06-10 05:46,156b0cf9fbbe79bc94277886a7b933f7,MA multi-user EL maps (linear_interp_blend 0.95; blend 0.98),recorded in data/test/el_pidr_batch.mat
+el/final/refiner.pth,el,final,,refiner,32,pidr_refiner_0.8el.pth,2026-06-12 00:58,f3c9e1979e88c40a9ef9171bf4770175,MA multi-user EL maps,recorded in data/test/el_pidr_batch.mat
+el/legacy_dataset/baselines/diffusion.pth,el,legacy_dataset,baselines,diffusion,64,physics_model_best_nop_el.pth,2026-04-23 07:44,287134e099155337279b8c6b855f76aa,EL row of the paper (April EL dataset no longer present),date before results (04-23 < 04-28); outputs garbage on current el.mat
+el/legacy_dataset/baselines/pinn.pth,el,legacy_dataset,baselines,pinn,32,cnn_pinn_best_el2.pth,2026-04-14 19:35,e647fe8909cdaade49108697a4a7180d,April EL PINN (candidate; original overwritten 06-16),date 04-14; outputs garbage on current el.mat
+el/legacy_dataset/pidr/diffusion.pth,el,legacy_dataset,pidr,diffusion,64,cascade_diffusion_transformer_for_pinn_best_el.pth,2026-04-19 02:32,25d79c6b387179cddb7454667dbcf9f3,EL row PIDR-Net (results/method_comparison_el),only PIDR pair existing on 04-28; outputs garbage on current el.mat
+el/legacy_dataset/pidr/refiner.pth,el,legacy_dataset,pidr,refiner,32,cascade_pinn_best_el.pth,2026-04-19 02:43,b37eddde66d3838d7bb61192fecd1d0c,EL row PIDR-Net (results/method_comparison_el),paired with el/legacy_dataset/pidr/diffusion.pth
+el/pidr/diffusion.pth,el,pidr,,diffusion,64,pidr_diffusion_el (2).pth,2026-06-16 04:44,ea206101e85fb865799f1c9fa791acde,not in paper (trained on current el.mat),el preset default
+el/pidr/refiner.pth,el,pidr,,refiner,32,pidr_refiner_eltest.pth,2026-06-16 04:52,82704358ba5179c9108a45af589e6ee1,not in paper (trained on current el.mat),el preset default
+fd/baselines/diffusion.pth,fd,baselines,,diffusion,64,physics_model_best_nop_fd.pth,2026-04-19 20:18,982321d8673c87e4e1dc1796173cd0fb,Cross-dataset FD: its numbers match the paper's FD *PIDR-Net* row,re-eval NMSE -41.56/-42.00 SSIM .987/.988 vs PIDR row -41.919/.989; no refiner pair reproduces that row
+fd/baselines/pinn.pth,fd,baselines,,pinn,32,cnn_pinn_best_fd.pth,2026-06-13 07:41,bcf2c22a736f51e4da79e9d91a7dc901,closest to paper FD PINN,re-eval NMSE -37.23 vs -37.12 (deterministic; not exact)
+fd/final/diffusion.pth,fd,final,,diffusion,32,pidr_diffusion_fd.pth,2026-06-10 05:28,880b1deec7dd4b8fca13025e7309dc51,MA multi-user FD maps (base channels 32),recorded in data/test/fd_pidr_field_model_batch.mat
+fd/final/refiner.pth,fd,final,,refiner,32,pidr_refiner_fd.pth,2026-06-12 06:01,0689901a6526d7aec6daa97d551c6c5e,MA multi-user FD maps,recorded in data/test/fd_pidr_field_model_batch.mat
+fd/pidr_cascade/diffusion.pth,fd,pidr_cascade,,diffusion,64,cascade_diffusion_transformer_for_pinn_best_fd.pth,2026-04-04 06:23,c6ef08b67426702e45fd8cd480afa32e,not reproduced in paper,PIDR re-eval NMSE -36.78
+fd/pidr_cascade/refiner.pth,fd,pidr_cascade,,refiner,32,cascade_pinn_best_fd.pth,2026-04-04 07:55,2b8925d3effb30fcdd9dbdca973a4c67,not reproduced in paper,paired with fd/pidr_cascade/diffusion.pth
+sr/baselines/diffusion.pth,sr,baselines,,diffusion,64,physics_model_best_nop_sr.pth,2026-04-08 07:52,975b15acede225e421cdef8ed63f0f15,Main table SR Diffusion; sampling-strategy Diffusion,re-eval matches (train: NMSE -40.96 vs -40.85; test: -39.86 vs -39.82)
+sr/baselines/pinn.pth,sr,baselines,,pinn,32,cnn_pinn_best_sr2.pth,2026-04-19 01:31,728446f8fbf7accf08a42da140f3d86c,closest to paper SR PINN (paper weights lost),re-eval close but not exact (NMSE -37.57 vs -37.69); original PINN overwritten 06-13
+sr/final/diffusion.pth,sr,final,,diffusion,64,pidr_diffusion_sr.pth,2026-06-09 00:34,58fa52de44f1fe965034032cb88680d9,MA single/multi-user SR maps (ddim_x0 stride 20; blend 0.7),recorded in data/test/sr_pidr_batch.mat; regenerated bit-identical
+sr/final/refiner.pth,sr,final,,refiner,32,pidr_refiner_sr.pth,2026-06-12 09:28,210895495cb51060d5b5a580a3c838f3,MA single/multi-user SR maps,recorded in data/test/sr_pidr_batch.mat
+sr/mask_ratio/rho0.70/diffusion.pth,sr,mask_ratio,rho0.70,diffusion,64,pidr_diffusion_0.7sr.pth,2026-04-28 03:00,7dfa5f2809040c753512bbdf6bb9e5d7,Missing ratio 0.70,recorded in results CSV; re-eval NMSE -43.61 vs -43.54
+sr/mask_ratio/rho0.70/refiner.pth,sr,mask_ratio,rho0.70,refiner,32,pidr_refiner_0.7sr.pth,2026-04-28 06:30,e60fc2a02c3c948abc102694e7d3ed00,Missing ratio 0.70,recorded in results CSV
+sr/mask_ratio/rho0.80/diffusion.pth,sr,mask_ratio,rho0.80,diffusion,64,pidr_diffusion_0.8sr.pth,2026-04-28 03:15,7e9e7f6cd1d8998eeba8ff03bd46dc10,Missing ratio 0.80,recorded in results CSV; re-eval NMSE -41.55/-41.64 vs -41.638
+sr/mask_ratio/rho0.80/refiner.pth,sr,mask_ratio,rho0.80,refiner,32,pidr_refiner_0.8sr.pth,2026-04-28 06:28,de44ed2ee1bd69a1dd890c719b62c822,Missing ratio 0.80,recorded in results CSV
+sr/mask_ratio/rho0.90/diffusion.pth,sr,mask_ratio,rho0.90,diffusion,64,pidr_diffusion_0.9sr.pth,2026-04-28 04:17,92d2d9182fcdad0e69b9454c91dd846d,Missing ratio 0.90,recorded in results CSV; 6-seed re-eval NMSE -38.53..-38.83 vs -38.62
+sr/mask_ratio/rho0.90/refiner.pth,sr,mask_ratio,rho0.90,refiner,32,pidr_refiner_0.9sr.pth,2026-04-28 06:30,dcb844f1fc52a0db1cedf6c54eb610a8,Missing ratio 0.90,recorded in results CSV
+sr/mask_ratio/rho0.95/diffusion.pth,sr,mask_ratio,rho0.95,diffusion,64,pidr_diffusion_0.95sr.pth,2026-05-06 01:15,bde2274291ce6b76b5a9535199ff2277,Missing ratio 0.95,recorded in results CSV; re-eval NMSE -30.79 vs -30.83
+sr/mask_ratio/rho0.95/refiner.pth,sr,mask_ratio,rho0.95,refiner,32,pidr_refiner_0.99sr.pth,2026-05-01 08:22,2598e8596207fb5e722cccc4f4831179,Missing ratio 0.95 (refiner was trained at 0.99),recorded in results CSV
+sr/pidr/diffusion.pth,sr,pidr,,diffusion,64,pidr_diffusion_0.8sr_recovered_run1.pth,2026-06-15 01:08,f6d5f8e2df5f05626f348e1a7e724e3f,Main table SR PIDR-Net (most likely),8-seed re-eval NMSE -42.77+-0.07 vs -42.725; SSIM .960 vs .959
+sr/pidr/refiner.pth,sr,pidr,,refiner,32,pidr_refiner_0.8sr_recovered_run1.pth,2026-06-15 02:13,6090d77b9aefd342f8b4ea1cdce4eccb,Main table SR PIDR-Net (most likely),paired with sr/pidr/diffusion.pth
+sr/pidr_cascade/diffusion.pth,sr,pidr_cascade,,diffusion,64,cascade_diffusion_transformer_for_pinn_best_sr.pth,2026-04-08 19:42,379d7f0d9709108fc26ba11af0bf1344,Sampling-strategy PIDR-Net,benchmark config fallback (05-06); re-eval NMSE -41.60/-41.65 vs -41.643
+sr/pidr_cascade/refiner.pth,sr,pidr_cascade,,refiner,32,cascade_pinn_best_sr.pth,2026-04-08 20:33,798ea15dcd1432a3abbf3f4e6b5318e5,Sampling-strategy PIDR-Net,paired with sr/pidr_cascade/diffusion.pth
+sr/semisup/alpha0.1/diffusion.pth,sr,semisup,alpha0.1,diffusion,64,pidr_partial_diffusion_0.1sr.pth,2026-05-01 07:11,5f1abd6f148a5fa062a7e321a1939f13,Semi-supervised alpha=0.1,recorded in results CSV
+sr/semisup/alpha0.1/refiner.pth,sr,semisup,alpha0.1,refiner,32,pidr_partial_refiner_0.1sr.pth,2026-05-01 08:25,4f7cf701ff76b0cef636152e267118fd,Semi-supervised alpha=0.1,recorded in results CSV
+sr/semisup/alpha0.2/diffusion.pth,sr,semisup,alpha0.2,diffusion,64,pidr_partial_diffusion_0.2sr.pth,2026-05-05 03:43,f537ef8c06573e6a107ee9d6b1d0cd31,Semi-supervised alpha=0.2,recorded in results CSV
+sr/semisup/alpha0.2/refiner.pth,sr,semisup,alpha0.2,refiner,32,pidr_partial_refiner_0.2sr.pth,2026-05-05 05:42,cb6beebb1c5ddb707c69caf13caaf105,Semi-supervised alpha=0.2,recorded in results CSV
+sr/semisup/alpha0.3/diffusion.pth,sr,semisup,alpha0.3,diffusion,64,pidr_partial_diffusion_0.3sr.pth,2026-04-30 07:35,f098803e3dd789f5a52763570203d74a,Semi-supervised alpha=0.3,recorded in results CSV
+sr/semisup/alpha0.3/refiner.pth,sr,semisup,alpha0.3,refiner,32,pidr_partial_refiner_0.3sr.pth,2026-04-30 09:01,b57ef5bbf4f18323dc0efcbe78447889,Semi-supervised alpha=0.3,recorded in results CSV
+sr/semisup/alpha0.4/diffusion.pth,sr,semisup,alpha0.4,diffusion,64,pidr_partial_diffusion_0.4sr.pth,2026-04-30 06:01,0d3a3826fa1c51539e1d8166110bdc55,Semi-supervised alpha=0.4,recorded in results CSV
+sr/semisup/alpha0.4/refiner.pth,sr,semisup,alpha0.4,refiner,32,pidr_partial_refiner_0.4sr.pth,2026-04-30 07:59,7ad0af6676c4a0fc4966a00ec0a489f3,Semi-supervised alpha=0.4,recorded in results CSV
+sr/semisup/alpha0.5/diffusion.pth,sr,semisup,alpha0.5,diffusion,64,pidr_partial_diffusion_0.5sr.pth,2026-05-02 05:04,f57db2dcab8c010bf8593c479a94f644,Semi-supervised alpha=0.5 (paper row was evaluated with alpha0.6 weights),see docs/checkpoints.md
+sr/semisup/alpha0.5/refiner.pth,sr,semisup,alpha0.5,refiner,32,pidr_partial_refiner_0.5sr.pth,2026-05-02 06:40,3834ec002c266a1e78b6ca4676808f92,Semi-supervised alpha=0.5 (paper row was evaluated with alpha0.6 weights),see docs/checkpoints.md
+sr/semisup/alpha0.6/diffusion.pth,sr,semisup,alpha0.6,diffusion,64,pidr_partial_diffusion_0.6sr.pth,2026-05-02 08:57,0f949f398cfb096e3e5511a7ab6d3710,Semi-supervised alpha=0.6 (and the paper's alpha=0.5 row),recorded in results CSV
+sr/semisup/alpha0.6/refiner.pth,sr,semisup,alpha0.6,refiner,32,pidr_partial_refiner_0.6sr.pth,2026-05-02 10:23,57276975d41d0d6c36e192783cd9374a,Semi-supervised alpha=0.6 (and the paper's alpha=0.5 row),recorded in results CSV
+archive/cnn_pinn_best_sr.pth,,archive,,,32,cnn_pinn_best_sr.pth,2026-06-13 06:29,4b412874f1aec4a11fc84e99892737ff,unused (06-13 retrain; overwrote the paper PINN),
+archive/diffusion_fd.pth,,archive,,,64,diffusion_fd.pth,2026-06-13 06:58,73cc03b14e6bb7c37b8c35891331c224,unused (06-13 diffusion retrain),
+archive/diffusion_sr.pth,,archive,,,64,diffusion_sr.pth,2026-06-13 04:51,93a58870bb17fe0da94a5c69743073d8,unused (06-13 diffusion retrain),
+archive/pidr_diffusion_0.6sr.pth,,archive,,,64,pidr_diffusion_0.6sr.pth,2026-04-30 04:25,60c58e53578f99e9958acd7ed4a65d0d,unused (missing ratio 0.6),
+archive/pidr_diffusion_0.8fd.pth,,archive,,,64,pidr_diffusion_0.8fd.pth,2026-06-15 12:30,19abc707f5dbf416cd2a7e1e3ef6e56d,broken on current field.mat (NMSE -23 dB),
+archive/pidr_diffusion_0.8sr_recovered_20260615_223859.pth,,archive,,,64,pidr_diffusion_0.8sr_recovered_20260615_223859.pth,2026-06-15 09:39,fb9c5039750228d002028385ea2a4c08,unused (SR recovery retrain),
+archive/pidr_diffusion_0.99sr.pth,,archive,,,64,pidr_diffusion_0.99sr.pth,2026-05-01 06:18,827a4500b4b40384ce04635e9c8eb9e6,unused (missing ratio 0.99),
+archive/pidr_diffusion_el.pth,,archive,,,64,pidr_diffusion_el.pth,2026-06-11 06:49,e062cd4de33b6546e280ee34156afb6b,unused (EL retrain 06-11),
+archive/pidr_diffusion_el_bs32_8k_stepscale_run1.pth,,archive,,,64,pidr_diffusion_el_bs32_8k_stepscale_run1.pth,2026-06-15 07:39,1deb5713b1f999c66cc46703786dbcd6,unused (EL experiment),
+archive/pidr_diffusion_elang.pth,,archive,,,64,pidr_diffusion_elang.pth,2026-06-14 01:55,9bb87738ff801cf01635de8b4e0816c2,unused (elang dataset),
+archive/pidr_diffusion_elang2.pth,,archive,,,64,pidr_diffusion_elang2.pth,2026-06-14 01:48,b9a8e5a4a48724a6f4210461c6bef4e8,unused (elang dataset),
+archive/pidr_diffusion_eltest.pth,,archive,,,64,pidr_diffusion_eltest.pth,2026-06-16 04:58,74cd070163e97a01638c63abff0d662d,unused (EL experiment),
+archive/pidr_partial_diffusion_0.1_0.1sr.pth,,archive,,,64,pidr_partial_diffusion_0.1_0.1sr.pth,2026-05-05 07:34,4658859332949317b397abe66b57365c,unused (semi-supervised input-fraction sweep),
+archive/pidr_partial_diffusion_0.1_0.6sr.pth,,archive,,,64,pidr_partial_diffusion_0.1_0.6sr.pth,2026-05-05 20:56,d1839dd11ed511ad52f81f515cba6311,unused (semi-supervised input-fraction sweep),
+archive/pidr_partial_diffusion_0.1_0.7sr.pth,,archive,,,64,pidr_partial_diffusion_0.1_0.7sr.pth,2026-05-06 00:10,7d8335f8888952f84892cc0aa7bbe127,unused (semi-supervised input-fraction sweep),
+archive/pidr_partial_diffusion_0.1_0.8sr.pth,,archive,,,64,pidr_partial_diffusion_0.1_0.8sr.pth,2026-05-06 00:09,e8641e84b4b480ad0068b298f27072bd,unused (semi-supervised input-fraction sweep),
+archive/pidr_partial_refiner_0.1_0.1sr.pth,,archive,,,32,pidr_partial_refiner_0.1_0.1sr.pth,2026-05-05 08:26,3a55dc7211a9c4db3d170a967c69d89a,unused (semi-supervised input-fraction sweep),
+archive/pidr_partial_refiner_0.1_0.6sr.pth,,archive,,,32,pidr_partial_refiner_0.1_0.6sr.pth,2026-05-05 21:34,d779af44b7fe7bbf61f8a321d144b8a3,unused (semi-supervised input-fraction sweep),
+archive/pidr_partial_refiner_0.1_0.7sr.pth,,archive,,,32,pidr_partial_refiner_0.1_0.7sr.pth,2026-05-06 01:58,d8bf7a77d9e9cc0d095b4ab36c52e113,unused (semi-supervised input-fraction sweep),
+archive/pidr_partial_refiner_0.1_0.8sr.pth,,archive,,,32,pidr_partial_refiner_0.1_0.8sr.pth,2026-05-06 01:53,48b6633f885ba5fd411b41a6bea6b34f,unused (semi-supervised input-fraction sweep),
+archive/pidr_realimag_diffusion.pth,,archive,,,64,pidr_realimag_diffusion.pth,2026-05-27 01:58,6832c6d1bfe1787dac826ce183350594,unused (2-channel variant),
+archive/pidr_realimag_refiner.pth,,archive,,,32,pidr_realimag_refiner.pth,2026-05-27 02:55,a3d4ae8d2ad6fb98f62628ee98be02ff,unused (2-channel variant),
+archive/pidr_refiner_0.6sr.pth,,archive,,,32,pidr_refiner_0.6sr.pth,2026-04-30 06:18,34c5ebe3d347fc1b616dd3edacda8819,unused (missing ratio 0.6),
+archive/pidr_refiner_0.8fd.pth,,archive,,,32,pidr_refiner_0.8fd.pth,2026-06-15 14:07,09ddcff0e1b77a26562340581d1f1794,unused (FD recovery retrain),
+archive/pidr_refiner_0.8fd_recovered_20260615_214124.pth,,archive,,,32,pidr_refiner_0.8fd_recovered_20260615_214124.pth,2026-06-15 10:40,f9f9ecb6d2b0193ecd29c34c49d41ce7,unused (FD recovery retrain),
+archive/pidr_refiner_0.8fd_recovered_20260616_005027.pth,,archive,,,32,pidr_refiner_0.8fd_recovered_20260616_005027.pth,2026-06-15 18:58,63e952edf494b4e861015693ceff7848,unused (FD recovery retrain),
+archive/pidr_refiner_0.8sr_recovered_20260615_223859.pth,,archive,,,32,pidr_refiner_0.8sr_recovered_20260615_223859.pth,2026-06-15 12:00,5a95c093155c86e615e4dd1ee60da618,unused (SR recovery retrain),
+archive/pidr_refiner_el.pth,,archive,,,32,pidr_refiner_el.pth,2026-06-11 06:57,952112b233490033755169b955cb6f3e,unused (EL retrain 06-11),
+archive/pidr_refiner_el_bs32_8k_stepscale_run1.pth,,archive,,,32,pidr_refiner_el_bs32_8k_stepscale_run1.pth,2026-06-15 08:55,167eb58047404401ec8f5999e3ea2608,unused (EL experiment),
+archive/pidr_refiner_elang.pth,,archive,,,32,pidr_refiner_elang.pth,2026-06-14 02:01,25efddb01c009590dfb9b95c1c840ea6,unused (elang dataset),
+archive/pidr_refiner_elang2.pth,,archive,,,32,pidr_refiner_elang2.pth,2026-06-14 01:56,c21a58b4873066d563a9cd0d6d3d855f,unused (elang dataset),

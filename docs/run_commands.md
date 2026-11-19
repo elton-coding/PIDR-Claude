@@ -1,7 +1,7 @@
 # Final Model Metadata and Run Commands
 
 This file records the final PIDR-Net models for the EL, Field/FD and SR datasets
-(weights in `checkpoints/final/{el,fd,sr}/`). These models produced the reconstructed
+(weights in `checkpoints/{el,fd,sr}/final/`). These models produced the reconstructed
 maps in `data/test/*_pidr_*batch.mat` that the paper's movable-antenna experiments use.
 Run all commands from the repository root in PowerShell (activate the conda env first).
 
@@ -23,8 +23,8 @@ conda activate ma_diffusion
 
 - Train dataset: `.\data\el.mat`
 - Test/generation input example: `.\data\test\el.mat`
-- Diffusion checkpoint: `.\checkpoints\final\el\pidr_diffusion_el.pth`
-- Refiner checkpoint: `.\checkpoints\final\el\pidr_refiner_el.pth`
+- Diffusion checkpoint: `.\checkpoints\el\final\diffusion.pth`
+- Refiner checkpoint: `.\checkpoints\el\final\refiner.pth`
 - Refiner format: plain `state_dict`
 - Split ratio: `0.9`
 - Split seed: `42`
@@ -49,8 +49,8 @@ python -m scripts.ma.generate_channel_maps `
   --output .\data\test\el_pidr_el_model_batch.mat `
   --heatmap-dir .\data\test\el_pidr_el_model_heatmaps `
   --metrics .\data\test\el_pidr_el_model_metrics.csv `
-  --diffusion-ckpt .\checkpoints\final\el\pidr_diffusion_el.pth `
-  --refiner-ckpt .\checkpoints\final\el\pidr_refiner_el.pth `
+  --diffusion-ckpt .\checkpoints\el\final\diffusion.pth `
+  --refiner-ckpt .\checkpoints\el\final\refiner.pth `
   --norm-stats-mat .\data\el.mat `
   --mask-ratio 0.8 `
   --mask-strategy random `
@@ -71,8 +71,8 @@ python -m scripts.ma.generate_channel_maps `
 ```powershell
 python -m scripts.eval.evaluate_pidr `
   --data-path .\data\el.mat `
-  --diffusion-ckpt .\checkpoints\final\el\pidr_diffusion_el.pth `
-  --refiner-ckpt .\checkpoints\final\el\pidr_refiner_el.pth `
+  --diffusion-ckpt .\checkpoints\el\final\diffusion.pth `
+  --refiner-ckpt .\checkpoints\el\final\refiner.pth `
   --mode test `
   --split-ratio 0.9 `
   --split-seed 42 `
@@ -96,8 +96,8 @@ python -m scripts.eval.evaluate_pidr `
 ```powershell
 python -m scripts.eval.evaluate_pidr `
   --data-path .\data\el.mat `
-  --diffusion-ckpt .\checkpoints\final\el\pidr_diffusion_el.pth `
-  --refiner-ckpt .\checkpoints\final\el\pidr_refiner_el.pth `
+  --diffusion-ckpt .\checkpoints\el\final\diffusion.pth `
+  --refiner-ckpt .\checkpoints\el\final\refiner.pth `
   --mode train `
   --split-ratio 0.9 `
   --split-seed 42 `
@@ -122,8 +122,8 @@ python -m scripts.eval.evaluate_pidr `
 
 - Train dataset: `.\data\field.mat`
 - Test/generation input example: `.\data\test\fd.mat`
-- Diffusion checkpoint: `.\checkpoints\final\fd\pidr_diffusion_fd.pth`
-- Refiner checkpoint: `.\checkpoints\final\fd\pidr_refiner_fd.pth`
+- Diffusion checkpoint: `.\checkpoints\fd\final\diffusion.pth`
+- Refiner checkpoint: `.\checkpoints\fd\final\refiner.pth`
 - Refiner format: plain `state_dict`
 - Split ratio: `0.9`
 - Split seed: `42`
@@ -148,8 +148,8 @@ python -m scripts.ma.generate_channel_maps `
   --output .\data\test\fd_pidr_field_model_batch.mat `
   --heatmap-dir .\data\test\fd_pidr_field_model_heatmaps `
   --metrics .\data\test\fd_pidr_field_model_metrics.csv `
-  --diffusion-ckpt .\checkpoints\final\fd\pidr_diffusion_fd.pth `
-  --refiner-ckpt .\checkpoints\final\fd\pidr_refiner_fd.pth `
+  --diffusion-ckpt .\checkpoints\fd\final\diffusion.pth `
+  --refiner-ckpt .\checkpoints\fd\final\refiner.pth `
   --norm-stats-mat .\data\field.mat `
   --mask-ratio 0.8 `
   --mask-strategy random `
@@ -170,8 +170,8 @@ python -m scripts.ma.generate_channel_maps `
 ```powershell
 python -m scripts.eval.evaluate_pidr `
   --data-path .\data\field.mat `
-  --diffusion-ckpt .\checkpoints\final\fd\pidr_diffusion_fd.pth `
-  --refiner-ckpt .\checkpoints\final\fd\pidr_refiner_fd.pth `
+  --diffusion-ckpt .\checkpoints\fd\final\diffusion.pth `
+  --refiner-ckpt .\checkpoints\fd\final\refiner.pth `
   --mode test `
   --split-ratio 0.9 `
   --split-seed 42 `
@@ -195,8 +195,8 @@ python -m scripts.eval.evaluate_pidr `
 ```powershell
 python -m scripts.eval.evaluate_pidr `
   --data-path .\data\field.mat `
-  --diffusion-ckpt .\checkpoints\final\fd\pidr_diffusion_fd.pth `
-  --refiner-ckpt .\checkpoints\final\fd\pidr_refiner_fd.pth `
+  --diffusion-ckpt .\checkpoints\fd\final\diffusion.pth `
+  --refiner-ckpt .\checkpoints\fd\final\refiner.pth `
   --mode train `
   --split-ratio 0.9 `
   --split-seed 42 `
@@ -221,8 +221,8 @@ python -m scripts.eval.evaluate_pidr `
 
 - Train dataset: `.\data\sr.mat`
 - Test/generation input example: `.\data\test\sr.mat`
-- Diffusion checkpoint: `.\checkpoints\final\sr\pidr_diffusion_sr.pth`
-- Refiner checkpoint: `.\checkpoints\final\sr\pidr_refiner_sr.pth`
+- Diffusion checkpoint: `.\checkpoints\sr\final\diffusion.pth`
+- Refiner checkpoint: `.\checkpoints\sr\final\refiner.pth`
 - Refiner format: plain `state_dict`
 - Split ratio: `0.9`
 - Split seed: `42`
@@ -247,8 +247,8 @@ python -m scripts.ma.generate_channel_maps `
   --output .\data\test\sr_pidr_sr_model_batch.mat `
   --heatmap-dir .\data\test\sr_pidr_sr_model_heatmaps `
   --metrics .\data\test\sr_pidr_sr_model_metrics.csv `
-  --diffusion-ckpt .\checkpoints\final\sr\pidr_diffusion_sr.pth `
-  --refiner-ckpt .\checkpoints\final\sr\pidr_refiner_sr.pth `
+  --diffusion-ckpt .\checkpoints\sr\final\diffusion.pth `
+  --refiner-ckpt .\checkpoints\sr\final\refiner.pth `
   --norm-stats-mat .\data\sr.mat `
   --mask-ratio 0.8 `
   --mask-strategy random `
@@ -269,8 +269,8 @@ python -m scripts.ma.generate_channel_maps `
 ```powershell
 python -m scripts.eval.evaluate_pidr `
   --data-path .\data\sr.mat `
-  --diffusion-ckpt .\checkpoints\final\sr\pidr_diffusion_sr.pth `
-  --refiner-ckpt .\checkpoints\final\sr\pidr_refiner_sr.pth `
+  --diffusion-ckpt .\checkpoints\sr\final\diffusion.pth `
+  --refiner-ckpt .\checkpoints\sr\final\refiner.pth `
   --mode test `
   --split-ratio 0.9 `
   --split-seed 42 `
@@ -294,8 +294,8 @@ python -m scripts.eval.evaluate_pidr `
 ```powershell
 python -m scripts.eval.evaluate_pidr `
   --data-path .\data\sr.mat `
-  --diffusion-ckpt .\checkpoints\final\sr\pidr_diffusion_sr.pth `
-  --refiner-ckpt .\checkpoints\final\sr\pidr_refiner_sr.pth `
+  --diffusion-ckpt .\checkpoints\sr\final\diffusion.pth `
+  --refiner-ckpt .\checkpoints\sr\final\refiner.pth `
   --mode train `
   --split-ratio 0.9 `
   --split-seed 42 `

@@ -7,8 +7,8 @@ problem comes from inference code or from the trained PIDR weights themselves.
 Example:
     python -m scripts.eval.evaluate_pidr ^
         --data-path ./data/el.mat ^
-        --diffusion-ckpt ./checkpoints/final/el/pidr_diffusion_el.pth ^
-        --refiner-ckpt ./checkpoints/final/el/pidr_refiner_el.pth ^
+        --diffusion-ckpt ./checkpoints/el/final/diffusion.pth ^
+        --refiner-ckpt ./checkpoints/el/final/refiner.pth ^
         --eval-fraction 1.0
 """
 
@@ -581,9 +581,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--img-height", type=int, default=None)
     parser.add_argument("--img-width", type=int, default=None)
     parser.add_argument("--train-sample-count", type=int, default=None)
-    parser.add_argument("--diffusion-ckpt", type=str, default="./checkpoints/final/el/pidr_diffusion_el.pth")
+    parser.add_argument("--diffusion-ckpt", type=str, default="./checkpoints/el/final/diffusion.pth")
     parser.add_argument("--diffusion-base-channels", type=int, default=None)
-    parser.add_argument("--refiner-ckpt", type=str, default="./checkpoints/final/el/pidr_refiner_el.pth")
+    parser.add_argument("--refiner-ckpt", type=str, default="./checkpoints/el/final/refiner.pth")
     parser.add_argument("--output-dir", type=str, default="./pidr_0.8el_recovered_testset_eval")
     parser.add_argument("--mode", type=str, default="test", choices=["train", "test", "all"])
     parser.add_argument("--split-ratio", type=float, default=Config.DATA_SPLIT_RATIO)

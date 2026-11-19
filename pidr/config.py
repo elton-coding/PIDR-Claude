@@ -11,8 +11,18 @@ when this module is imported:
 
 ``sr`` (Sionna RT) and ``fd`` (field response) use the paper's hyperparameter table;
 ``el`` (EM simulation, default) keeps the settings of the last EL experiment.
+
+Checkpoints
+-----------
+Curated weights live in ``checkpoints/<dataset>/<experiment>/[<setting>/]<stage>.pth``
+and are described in ``checkpoints/MANIFEST.csv`` (see docs/checkpoints.md). They are
+only ever *read* by this config. Training scripts write to a fresh run directory
+``runs/<dataset>/<YYYYmmdd_HHMMSS>/`` so a new training run can never overwrite a
+checkpoint that a paper result depends on; copy a run's output into ``checkpoints/``
+by hand and register it with ``python -m scripts.tools.checkpoint_manifest update``.
 """
 
+import datetime
 import os
 
 import torch
@@ -29,14 +39,12 @@ DATASET_PRESETS = {
         "learning_rate": 2e-4,
         "num_epochs": 1000,
         "force_rebuild_cache": False,
-        "diffusion_ckpt": "physics_model_best_nop_sr.pth",
-        "pinn_ckpt": "cnn_pinn_best_sr.pth",
-        "pidr_diffusion_ckpt": "pidr_diffusion_0.8sr.pth",
-        "pidr_refiner_ckpt": "pidr_refiner_0.8sr.pth",
-        "cache_tag": "0.8sr",
-        "legacy_tag": "sr",
+        # Main-table PIDR-Net; pidr_cascade is the sampling-strategy model.
+        "pidr_dir": "pidr",
+        "legacy_pidr_dir": "pidr_cascade",
     },
     # Same hyperparameters as SR; field.mat is also 32x32 with 10000 maps.
+    # fd/final (the MA model) has base channels 32, so the 64-channel pidr_cascade is the default.
     "fd": {
         "data_path": "./data/field.mat",
         "img_height": 32,
@@ -46,12 +54,8 @@ DATASET_PRESETS = {
         "learning_rate": 2e-4,
         "num_epochs": 1000,
         "force_rebuild_cache": False,
-        "diffusion_ckpt": "physics_model_best_nop_fd.pth",
-        "pinn_ckpt": "cnn_pinn_best_fd.pth",
-        "pidr_diffusion_ckpt": "pidr_diffusion_0.8fd.pth",
-        "pidr_refiner_ckpt": "pidr_refiner_0.8fd.pth",
-        "cache_tag": "0.8fd",
-        "legacy_tag": "fd",
+        "pidr_dir": "pidr_cascade",
+        "legacy_pidr_dir": "pidr_cascade",
     },
     # EM simulation data: 21x41 grid, 961 maps (864 for training).
     "el": {
@@ -63,12 +67,8 @@ DATASET_PRESETS = {
         "learning_rate": 2e-5,
         "num_epochs": 30000,
         "force_rebuild_cache": True,
-        "diffusion_ckpt": "diffusion_el.pth",
-        "pinn_ckpt": "cnn_pinn_best_el.pth",
-        "pidr_diffusion_ckpt": "pidr_diffusion_el (2).pth",
-        "pidr_refiner_ckpt": "pidr_refiner_eltest.pth",
-        "cache_tag": "el",
-        "legacy_tag": "el",
+        "pidr_dir": "pidr",
+        "legacy_pidr_dir": "pidr",
     },
 }
 
@@ -76,27 +76,42 @@ DATASET = os.environ.get("PIDR_DATASET", "el").strip().lower()
 if DATASET not in DATASET_PRESETS:
     raise ValueError(f"PIDR_DATASET must be one of {sorted(DATASET_PRESETS)}, got {DATASET!r}")
 _PRESET = DATASET_PRESETS[DATASET]
-_LEGACY = _PRESET["legacy_tag"]
+
+CHECKPOINT_DIR = "./checkpoints"
+# Output folder for this process's training run (created only when something is saved).
+RUN_DIR = os.path.join("./runs", DATASET, datetime.datetime.now().strftime("%Y%m%d_%H%M%S"))
+
+
+def ckpt(*parts):
+    """Path of a curated checkpoint for the active dataset."""
+    return os.path.join(CHECKPOINT_DIR, DATASET, *parts)
+
+
+def run_path(*parts):
+    """Path inside this process's training run directory."""
+    return os.path.join(RUN_DIR, *parts)
 
 
 class _PathsConfig:
     DATA_PATH = _PRESET["data_path"]
-    LOG_DIR = "./runs/diffusion"
+    LOG_DIR = run_path("tensorboard")
 
-    CHECKPOINT_DIR = "./checkpoints"
+    CHECKPOINT_DIR = CHECKPOINT_DIR
     CACHE_DIR = "./cache"
+    RUN_DIR = RUN_DIR
 
-    DIFFUSION_CHECKPOINT = os.path.join(CHECKPOINT_DIR, _PRESET["diffusion_ckpt"])
-    PINN_CHECKPOINT = os.path.join(CHECKPOINT_DIR, _PRESET["pinn_ckpt"])
-    PIDR_DIFFUSION_CHECKPOINT = os.path.join(CHECKPOINT_DIR, _PRESET["pidr_diffusion_ckpt"])
-    PIDR_REFINER_CHECKPOINT = os.path.join(CHECKPOINT_DIR, _PRESET["pidr_refiner_ckpt"])
-    PIDR_CACHE_TRAIN = os.path.join(CACHE_DIR, f"pidr_diffusion_recon_train_for_refiner_{_PRESET['cache_tag']}.pt")
-    PIDR_CACHE_TEST = os.path.join(CACHE_DIR, f"pidr_diffusion_recon_test_for_refiner_{_PRESET['cache_tag']}.pt")
+    # Curated checkpoints read by the benchmarks.
+    DIFFUSION_CHECKPOINT = ckpt("baselines", "diffusion.pth")
+    PINN_CHECKPOINT = ckpt("baselines", "pinn.pth")
+    PIDR_DIFFUSION_CHECKPOINT = ckpt(_PRESET["pidr_dir"], "diffusion.pth")
+    PIDR_REFINER_CHECKPOINT = ckpt(_PRESET["pidr_dir"], "refiner.pth")
+    PIDR_CACHE_TRAIN = run_path("cache", "pidr_diffusion_recon_train.pt")
+    PIDR_CACHE_TEST = run_path("cache", "pidr_diffusion_recon_test.pt")
 
-    LEGACY_PIDR_DIFFUSION_CHECKPOINT = os.path.join(CHECKPOINT_DIR, f"cascade_diffusion_transformer_for_pinn_best_{_LEGACY}.pth")
-    LEGACY_PIDR_REFINER_CHECKPOINT = os.path.join(CHECKPOINT_DIR, f"cascade_pinn_best_{_LEGACY}.pth")
-    LEGACY_PIDR_CACHE_TRAIN = os.path.join(CACHE_DIR, f"cascade_diffusion_transformer_recon_train_for_pinn_{_LEGACY}.pt")
-    LEGACY_PIDR_CACHE_TEST = os.path.join(CACHE_DIR, f"cascade_diffusion_transformer_recon_test_for_pinn_{_LEGACY}.pt")
+    LEGACY_PIDR_DIFFUSION_CHECKPOINT = ckpt(_PRESET["legacy_pidr_dir"], "diffusion.pth")
+    LEGACY_PIDR_REFINER_CHECKPOINT = ckpt(_PRESET["legacy_pidr_dir"], "refiner.pth")
+    LEGACY_PIDR_CACHE_TRAIN = PIDR_CACHE_TRAIN
+    LEGACY_PIDR_CACHE_TEST = PIDR_CACHE_TEST
 
     CASCADE_DIFFUSION_CHECKPOINT = PIDR_DIFFUSION_CHECKPOINT
     CASCADE_PINN_CHECKPOINT = PIDR_REFINER_CHECKPOINT
@@ -148,7 +163,8 @@ class _LossConfig:
 
 
 class _PinnConfig:
-    SAVE_PATH = _PathsConfig.PINN_CHECKPOINT
+    # scripts/train/train_pinn.py writes here (never into checkpoints/).
+    SAVE_PATH = run_path("baselines", "pinn.pth")
     WEIGHT_DECAY = 1e-4
     MIN_WARMUP_EPOCHS = 5
     MAX_LAMBDA_POWER = 1e-3
@@ -167,13 +183,15 @@ class _PIDRConfig:
     PINN_TRAIN_MASK_SEED = 12345
     FORCE_REBUILD_CACHE = _PRESET["force_rebuild_cache"]
 
-    DIFFUSION_CHECKPOINT = _PathsConfig.PIDR_DIFFUSION_CHECKPOINT
-    REFINER_CHECKPOINT = _PathsConfig.PIDR_REFINER_CHECKPOINT
+    # scripts/train/train_pidr.py writes here (never into checkpoints/).
+    DIFFUSION_CHECKPOINT = run_path("pidr", "diffusion.pth")
+    REFINER_CHECKPOINT = run_path("pidr", "refiner.pth")
     CACHE_TRAIN = _PathsConfig.PIDR_CACHE_TRAIN
     CACHE_TEST = _PathsConfig.PIDR_CACHE_TEST
 
-    LEGACY_DIFFUSION_CHECKPOINT = _PathsConfig.LEGACY_PIDR_DIFFUSION_CHECKPOINT
-    LEGACY_REFINER_CHECKPOINT = _PathsConfig.LEGACY_PIDR_REFINER_CHECKPOINT
+    # With TRAIN_DIFFUSION = False the refiner is trained on this curated diffusion model.
+    LEGACY_DIFFUSION_CHECKPOINT = _PathsConfig.PIDR_DIFFUSION_CHECKPOINT
+    LEGACY_REFINER_CHECKPOINT = _PathsConfig.PIDR_REFINER_CHECKPOINT
     LEGACY_CACHE_TRAIN = _PathsConfig.LEGACY_PIDR_CACHE_TRAIN
     LEGACY_CACHE_TEST = _PathsConfig.LEGACY_PIDR_CACHE_TEST
 
@@ -202,10 +220,16 @@ class _PartialSupervisionPIDRConfig:
     TRAIN_SPLIT_SEED = 2026
     EVAL_SPLIT_SEED = 0
 
-    DIFFUSION_CHECKPOINT = os.path.join(_PathsConfig.CHECKPOINT_DIR, "pidr_partial_diffusion_0.2sr.pth")
-    REFINER_CHECKPOINT = os.path.join(_PathsConfig.CHECKPOINT_DIR, "pidr_partial_refiner_0.2sr.pth")
-    CACHE_TRAIN = os.path.join(_PathsConfig.CACHE_DIR, "pidr_partial_diffusion_recon_train_0.2sr.pt")
-    CACHE_TEST = os.path.join(_PathsConfig.CACHE_DIR, "pidr_partial_diffusion_recon_test_0.2sr.pt")
+    # scripts/train/train_pidr_semisupervised.py writes here (never into checkpoints/).
+    # With TRAIN_DIFFUSION = False the refiner is trained on the curated alpha model instead.
+    _ALPHA_DIR = f"alpha{TOTAL_AVAILABLE_RATIO:g}"
+    DIFFUSION_CHECKPOINT = (
+        run_path("semisup", _ALPHA_DIR, "diffusion.pth") if TRAIN_DIFFUSION
+        else ckpt("semisup", _ALPHA_DIR, "diffusion.pth")
+    )
+    REFINER_CHECKPOINT = run_path("semisup", _ALPHA_DIR, "refiner.pth")
+    CACHE_TRAIN = run_path("cache", f"semisup_{_ALPHA_DIR}_recon_train.pt")
+    CACHE_TEST = run_path("cache", f"semisup_{_ALPHA_DIR}_recon_test.pt")
 
 
 class _PIDRBenchmarkConfig:
@@ -218,15 +242,15 @@ class _PIDRBenchmarkConfig:
 
     DIFFUSION_CHECKPOINT_CANDIDATES = [
         _PathsConfig.DIFFUSION_CHECKPOINT,
-       
     ]
     PINN_CHECKPOINT_CANDIDATES = [
         _PathsConfig.PINN_CHECKPOINT,
     ]
+    # No fallback to the baseline diffusion model: a missing PIDR checkpoint must fail
+    # loudly instead of silently reporting baseline-diffusion numbers as PIDR-Net.
     PIDR_DIFFUSION_CHECKPOINT_CANDIDATES = [
         _PathsConfig.PIDR_DIFFUSION_CHECKPOINT,
         _PathsConfig.LEGACY_PIDR_DIFFUSION_CHECKPOINT,
-        _PathsConfig.DIFFUSION_CHECKPOINT,
     ]
     PIDR_REFINER_CHECKPOINT_CANDIDATES = [
         _PathsConfig.PIDR_REFINER_CHECKPOINT,
@@ -243,20 +267,11 @@ class _MaskStrategyBenchmarkConfig:
     SAMPLING_STRIDE = 1
     NUM_EVAL_SAMPLES = 50
 
-    DIFFUSION_CHECKPOINT_CANDIDATES = [
-        os.path.join(_PathsConfig.CHECKPOINT_DIR, "physics_model_best_nop_sr.pth"),
-    ]
-    PINN_CHECKPOINT_CANDIDATES = [
-        os.path.join(_PathsConfig.CHECKPOINT_DIR, "cnn_pinn_best_sr.pth"),
-    ]
-    PIDR_DIFFUSION_CHECKPOINT_CANDIDATES = [
-        os.path.join(_PathsConfig.CHECKPOINT_DIR, "pidr_diffusion_best_sr.pth"),
-        os.path.join(_PathsConfig.CHECKPOINT_DIR, "cascade_diffusion_transformer_for_pinn_best_sr.pth"),
-    ]
-    PIDR_REFINER_CHECKPOINT_CANDIDATES = [
-        os.path.join(_PathsConfig.CHECKPOINT_DIR, "pidr_refiner_best_sr.pth"),
-        os.path.join(_PathsConfig.CHECKPOINT_DIR, "cascade_pinn_best_sr.pth"),
-    ]
+    # The paper's sampling-strategy table used the pidr_cascade model.
+    DIFFUSION_CHECKPOINT_CANDIDATES = [ckpt("baselines", "diffusion.pth")]
+    PINN_CHECKPOINT_CANDIDATES = [ckpt("baselines", "pinn.pth")]
+    PIDR_DIFFUSION_CHECKPOINT_CANDIDATES = [ckpt("pidr_cascade", "diffusion.pth"), ckpt("pidr", "diffusion.pth")]
+    PIDR_REFINER_CHECKPOINT_CANDIDATES = [ckpt("pidr_cascade", "refiner.pth"), ckpt("pidr", "refiner.pth")]
 
 
 class _PIDRMaskRatioBenchmarkConfig:
@@ -267,58 +282,17 @@ class _PIDRMaskRatioBenchmarkConfig:
     MASK_STRATEGY = "random"
     PLOT_FORMAT = "pdf"
 
-    # NOTE:
-    # - mask_ratio means missing ratio, consistent with Config.MASK_RATIO.
-    # - Replace checkpoint candidate lists with your own pretrained weights.
+    # mask_ratio is the missing ratio (as Config.MASK_RATIO). Weights live in
+    # checkpoints/<dataset>/mask_ratio/rho<ratio>/; note that the rho0.95 refiner was trained at 0.99.
     EXPERIMENTS = [
         {
-            "name": "mr70",
-            "label": "Missing 70%",
-            "mask_ratio": 0.70,
-            "pidr_diffusion_checkpoint_candidates": [
-                os.path.join(_PathsConfig.CHECKPOINT_DIR, "pidr_diffusion_0.7sr.pth"),
-            ],
-            "pidr_refiner_checkpoint_candidates": [
-                os.path.join(_PathsConfig.CHECKPOINT_DIR, "pidr_refiner_0.7sr.pth"),
-            ],
-        },
-        {
-            "name": "mr80",
-            "label": "Missing 80%",
-            "mask_ratio": 0.80,
-            "pidr_diffusion_checkpoint_candidates": [
-                os.path.join(_PathsConfig.CHECKPOINT_DIR, "pidr_diffusion_0.8sr.pth"),
-            ],
-            "pidr_refiner_checkpoint_candidates": [
-                os.path.join(_PathsConfig.CHECKPOINT_DIR, "pidr_refiner_0.8sr.pth"),
-            ],
-        },
-        {
-            "name": "mr90",
-            "label": "Missing 90%",
-            "mask_ratio": 0.90,
-            "pidr_diffusion_checkpoint_candidates": [
-                os.path.join(_PathsConfig.CHECKPOINT_DIR, "pidr_diffusion_0.9sr.pth"),
-            ],
-            "pidr_refiner_checkpoint_candidates": [
-                os.path.join(_PathsConfig.CHECKPOINT_DIR, "pidr_refiner_0.9sr.pth"),
-            ],
-        },
-        {
-            "name": "mr95",
-            "label": "Missing 95%",
-            "mask_ratio": 0.95,
-            "pidr_diffusion_checkpoint_candidates": [
-                os.path.join(_PathsConfig.CHECKPOINT_DIR, "pidr_diffusion_0.95sr.pth"),
-                _PathsConfig.PIDR_DIFFUSION_CHECKPOINT,
-                _PathsConfig.LEGACY_PIDR_DIFFUSION_CHECKPOINT,
-            ],
-            "pidr_refiner_checkpoint_candidates": [
-                os.path.join(_PathsConfig.CHECKPOINT_DIR, "pidr_refiner_0.99sr.pth"),
-                _PathsConfig.PIDR_REFINER_CHECKPOINT,
-                _PathsConfig.LEGACY_PIDR_REFINER_CHECKPOINT,
-            ],
-        },
+            "name": f"mr{round(ratio * 100)}",
+            "label": f"Missing {round(ratio * 100)}%",
+            "mask_ratio": ratio,
+            "pidr_diffusion_checkpoint_candidates": [ckpt("mask_ratio", f"rho{ratio:.2f}", "diffusion.pth")],
+            "pidr_refiner_checkpoint_candidates": [ckpt("mask_ratio", f"rho{ratio:.2f}", "refiner.pth")],
+        }
+        for ratio in (0.70, 0.80, 0.90, 0.95)
     ]
 
 
@@ -335,12 +309,9 @@ class _PartialSupervisionPIDRBenchmarkConfig:
     MASK_STRATEGY = _PartialSupervisionPIDRConfig.MASK_STRATEGY
     EVAL_SPLIT_SEED = _PartialSupervisionPIDRConfig.EVAL_SPLIT_SEED
 
-    DIFFUSION_CHECKPOINT_CANDIDATES = [
-        _PartialSupervisionPIDRConfig.DIFFUSION_CHECKPOINT,
-    ]
-    REFINER_CHECKPOINT_CANDIDATES = [
-        _PartialSupervisionPIDRConfig.REFINER_CHECKPOINT,
-    ]
+    # Curated weights for the configured alpha (checkpoints/<dataset>/semisup/alpha<a>/).
+    DIFFUSION_CHECKPOINT_CANDIDATES = [ckpt("semisup", f"alpha{TOTAL_AVAILABLE_RATIO:g}", "diffusion.pth")]
+    REFINER_CHECKPOINT_CANDIDATES = [ckpt("semisup", f"alpha{TOTAL_AVAILABLE_RATIO:g}", "refiner.pth")]
 
 
 class _BenchmarkConfig:
@@ -371,7 +342,7 @@ class Config:
 
     DATA_PATH = PATHS.DATA_PATH
     LOG_DIR = PATHS.LOG_DIR
-    SAVE_PATH = PATHS.DIFFUSION_CHECKPOINT
+    SAVE_PATH = run_path("baselines", "diffusion.pth")  # train_diffusion.py output
     DEVICE = RUNTIME.DEVICE
 
     IMG_HEIGHT = DATA.IMG_HEIGHT

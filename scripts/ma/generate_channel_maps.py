@@ -10,8 +10,8 @@ Example:
     python -m scripts.ma.generate_channel_maps ^
         --input ./data/test/el.mat ^
         --output ./data/test/el_pidr_batch.mat ^
-        --diffusion-ckpt ./checkpoints/final/el/pidr_diffusion_el.pth ^
-        --refiner-ckpt ./checkpoints/final/el/pidr_refiner_el.pth
+        --diffusion-ckpt ./checkpoints/el/final/diffusion.pth ^
+        --refiner-ckpt ./checkpoints/el/final/refiner.pth
 """
 
 from __future__ import annotations
@@ -673,8 +673,8 @@ def main() -> None:
     parser.add_argument("--output", "-o", type=str, default="./data/test/fd_pidr_batch.mat")
     parser.add_argument("--heatmap-dir", type=str, default="./data/test/fd_pidr_heatmaps")
     parser.add_argument("--metrics", type=str, default="./data/test/fd_pidr_metrics.csv")
-    parser.add_argument("--diffusion-ckpt", type=str, default="./checkpoints/final/fd/pidr_diffusion_fd.pth")
-    parser.add_argument("--refiner-ckpt", type=str, default="./checkpoints/final/fd/pidr_refiner_fd.pth")
+    parser.add_argument("--diffusion-ckpt", type=str, default="./checkpoints/fd/final/diffusion.pth")
+    parser.add_argument("--refiner-ckpt", type=str, default="./checkpoints/fd/final/refiner.pth")
     parser.add_argument("--mask-ratio", type=float, default=Config.MASK_RATIO)
     parser.add_argument("--mask-strategy", type=str, default=None, choices=["random", "uniform", "extreme_uneven"])
     parser.add_argument("--mask-seed", type=int, default=None)

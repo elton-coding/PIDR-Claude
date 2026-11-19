@@ -47,9 +47,11 @@
 │   └── slides/                   # 可编辑的示意图 PPT
 ├── docs/
 │   ├── run_commands.md           # 最终模型的元数据与完整运行命令
+│   ├── checkpoints.md            # 权重目录规范、论文实验与权重对照、复核发现的问题
 │   └── conditional_diffusion_algorithm_notes.md
 ├── data/                         # 数据集（不入 git）
-└── checkpoints/                  # 模型权重（不入 git），final/{sr,fd,el}/ 为最终模型
+├── checkpoints/                  # 模型权重（不入 git），按 <数据集>/<实验>/<设置>/ 组织，见 MANIFEST.csv
+└── runs/                         # 训练输出（不入 git），每次训练一个 <数据集>/<时间戳>/ 目录
 ```
 
 ## 环境
@@ -79,7 +81,9 @@ python -m scripts.train.train_pidr
 | EL | `data/el.mat` | EM simulation dataset |
 
 `data/test/` 中是 MA 实验用的 3 用户测试图及其 PIDR 重建结果（`*_pidr_*batch.mat`）。
-`cache/`（扩散重建缓存）已删除，`train_pidr.py` 训练细化器时会自动重新生成。
+权重按 `checkpoints/<数据集>/<实验>/<设置>/<阶段>.pth` 组织，每个文件的来源与用途登记在
+`checkpoints/MANIFEST.csv` 中，规范和论文对照见 [docs/checkpoints.md](docs/checkpoints.md)。
+训练脚本只写入 `runs/<数据集>/<时间戳>/`，不会覆盖 `checkpoints/` 中的权重；扩散重建缓存也放在该目录下。
 
 ## 论文实验与代码对照
 
@@ -93,12 +97,7 @@ python -m scripts.train.train_pidr
 | MA position optimization, multi user (SR/FD/EL) | `scripts/ma/generate_channel_maps.py` + `scripts/ma/ma_multi_user.py` | `results/ma_multi_user/{sr,fd,el}/` |
 
 说明：论文主表中 SR 与 FD 两行的原始结果目录已不在磁盘上，只保留了生成它们的脚本。
-
-各实验使用的权重在 `pidr/config.py` 对应的 `_*BenchmarkConfig` 中列出，例如：
-
-- 缺失率实验：`checkpoints/pidr_diffusion_{0.7,0.8,0.9,0.95}sr.pth` 与 `pidr_refiner_{0.7,0.8,0.9,0.99}sr.pth`；
-- 采样策略实验：`physics_model_best_nop_sr.pth`、`cnn_pinn_best_sr.pth`、`cascade_*_best_sr.pth`；
-- 半监督实验：`pidr_partial_{diffusion,refiner}_{0.1..0.6}sr.pth`。
+各实验对应的权重及复核结论（包括 α=0.5 用错权重、FD 主表等问题）见 [docs/checkpoints.md](docs/checkpoints.md)。
 
 最终模型（用于 MA 实验）的完整推理/评估命令见 [docs/run_commands.md](docs/run_commands.md)。
 
@@ -115,11 +114,11 @@ $env:PIDR_DATASET = "sr"; python -m scripts.train.train_pidr
 PIDR_DATASET=sr python -m scripts.train.train_pidr
 ```
 
-| 预设 | 数据 | 网格 | 训练样本 | lr / epochs | 默认权重（Diffusion / PINN / PIDR 扩散 + 细化） |
+| 预设 | 数据 | 网格 | 训练样本 | lr / epochs | 默认权重（`checkpoints/` 下：基线 / PIDR-Net） |
 |---|---|---|---|---|---|
-| `sr` | `data/sr.mat` | 32×32 | 9000 | 2e-4 / 1000 | `physics_model_best_nop_sr` / `cnn_pinn_best_sr` / `pidr_{diffusion,refiner}_0.8sr` |
-| `fd` | `data/field.mat` | 32×32 | 9000 | 2e-4 / 1000 | `physics_model_best_nop_fd` / `cnn_pinn_best_fd` / `pidr_{diffusion,refiner}_0.8fd` |
-| `el` | `data/el.mat` | 21×41 | 864 | 2e-5 / 30000 | `diffusion_el` / `cnn_pinn_best_el` / `pidr_diffusion_el (2)` + `pidr_refiner_eltest` |
+| `sr` | `data/sr.mat` | 32×32 | 9000 | 2e-4 / 1000 | `sr/baselines/` / `sr/pidr/` |
+| `fd` | `data/field.mat` | 32×32 | 9000 | 2e-4 / 1000 | `fd/baselines/` / `fd/pidr_cascade/` |
+| `el` | `data/el.mat` | 21×41 | 864 | 2e-5 / 30000 | `el/baselines/` / `el/pidr/` |
 
 `sr`、`fd` 使用论文超参数表；`el` 保留最后一次 EL 实验的设置（与整理前的默认值完全相同）。
 带有独立命令行参数的脚本（`evaluate_pidr`、`generate_channel_maps`、`train_pidr_ssim_target`）
@@ -139,12 +138,12 @@ PIDR_DATASET=sr python -m scripts.train.train_pidr
 | PINN | base channels 32 |
 
 > **注意**：默认预设是 `el`，复现 SR 结果前务必设置 `PIDR_DATASET=sr`。
-> `checkpoints/pidr_diffusion_fd.pth` 是 32 通道模型（base channels 32），不在 `fd` 预设中，
+> `checkpoints/fd/final/diffusion.pth` 是 32 通道模型（base channels 32），不在 `fd` 预设中，
 > 只能通过 `--diffusion-base-channels 32` 在最终模型命令里使用。
 >
-> 另外，旧版 SR 权重训练时 `diffusion.py` 的增益投影为 `10*log10(re²+im²)`（功率形式），
-> 当前代码为 `5*log10(re²+im²)`（与数据中 `CSI_Gain = 10*log10|h|` 一致）。
-> 重新训练表明 SR 在当前形式下同样可达 SSIM > 0.95。
+> 另外，2026-06 数据集重新导出后 `CSI_Gain` 从 `10*log10|h|²` 变为 `10*log10|h|`，
+> `diffusion.py` 的增益投影相应从 `10*log10(re²+im²)` 改为 `5*log10(re²+im²)`，两者等价，旧权重可直接使用。
+> 但论文中的 MSE 是旧尺度：用当前数据评估得到的 MSE 需乘以 4 才能与论文比较。
 
 ## 编译论文
 

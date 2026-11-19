@@ -857,7 +857,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--mask-strategy", default="random", choices=["random", "uniform", "extreme_uneven"])
     parser.add_argument("--train-mask-seed", type=int, default=12345)
     parser.add_argument("--eval-mask-seed", type=int, default=0)
-    parser.add_argument("--diffusion-ckpt", default="./checkpoints/pidr_diffusion_0.8el.pth")
+    parser.add_argument("--diffusion-ckpt", default="./checkpoints/el/final/diffusion.pth")
     parser.add_argument("--diffusion-base-channels", type=int, default=None)
     parser.add_argument("--init-refiner-ckpt", default="")
     parser.add_argument("--sample-stride", type=int, default=1)
