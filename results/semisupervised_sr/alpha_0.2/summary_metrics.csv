@@ -1,0 +1,2 @@
+Method,Avg_Input_Count,Avg_Supervision_Count,Avg_Available_Count,Avg_MSE,Avg_NMSE_dB,Avg_SSIM
+PIDR-Net,102.0,103.0,205.0,4.0590381461381915,-35.14316593800068,0.8280598578542859
