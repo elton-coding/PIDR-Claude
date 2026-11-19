@@ -116,3 +116,45 @@ checkpoints/
 - 权重：`checkpoints/fd/pidr/`，训练日志：`checkpoints/fd/pidr/refiner_train.log`
 
 与其他数据集一致，最佳 epoch 仍按测试集挑选（问题 9）。
+
+## Refiner 物理先验消融（SR，2026-11，未写入论文）
+
+问题：refiner 输入端的可学习传播先验（`PropagationPrior`：路径损耗幅度 + `cos/sin(k·d)` 相位，
+3 通道）是否有用？三个变体只改输入通道，其余完全相同（同一冻结扩散模型 `sr/pidr/diffusion.pth`、
+同一扩散重建缓存、seed 0、1000 epochs、missing-region L1）：
+
+| 变体 | 输入 | 参数量 |
+|---|---|---|
+| A_full | 扩散估计 + 掩码 + 传播先验 + 坐标（论文设计） | 151 018 |
+| B_no_prior | 扩散估计 + 掩码 + 坐标 | 150 147 |
+| C_plain | 扩散估计 + 掩码 | 149 571 |
+
+结果（`results/refiner_ablation_sr/`，增益通道，论文单位）：
+
+| 评估 | 方法 | MSE | NMSE (dB) | PSNR (dB) | SSIM |
+|---|---|---|---|---|---|
+| 全部 1000 张测试图（缓存扩散输出） | 仅扩散 | 1.535 | −39.92 | 28.33 | 0.924 |
+| | A_full | 1.161 | −42.01 | 30.41 | 0.952 |
+| | B_no_prior | **1.086** | **−42.34** | **30.74** | **0.957** |
+| | C_plain | 1.128 | −41.99 | 30.39 | 0.954 |
+| 论文协议（前 50 张，5 个采样 seed，NMSE std ≈ 0.07） | 仅扩散 | 1.600 | −39.58 | 28.63 | 0.928 |
+| | A_full | 1.195 | −41.82 | 30.87 | 0.955 |
+| | B_no_prior | **1.115** | **−42.17** | **31.22** | **0.960** |
+| | C_plain | 1.160 | −41.81 | 30.86 | 0.958 |
+
+- 逐图配对：A 的 MSE 低于 B 的只占 13.2%，低于 C 的占 40.1%。
+- 验证集 missing-MSE（3 通道）：A 0.000956、B 0.000908、C 0.000931；三者最佳 epoch 都在 943–994，尚未完全收敛。
+- 学到的先验参数（A）：tx ≈ (0.52, 0.49)，n ≈ 1.65，k ≈ 1.28。
+- 原因分析：SR 每张图的发射机位置不同（测试集最强增益点分布在 620 个不同网格，x/y 标准差约 0.33），
+  而先验只有一组全局可学习参数，收敛到图中心，退化为一个固定的径向特征，不携带逐图信息；
+  k 很小，相位先验在网格内几乎单调，同样只是距离的函数。
+- 结论：在当前设计下，物理先验对 SR 没有带来增益（略差于只用坐标）。仅一个训练 seed，A/B 差 0.33 dB 未做训练 seed 方差估计。
+
+复现：
+
+```bash
+PIDR_DATASET=sr python -m scripts.train.train_refiner_ablation --variants A B C --seed 0
+PIDR_DATASET=sr python -m scripts.eval.eval_refiner_ablation
+```
+
+权重：`checkpoints/sr/ablation_refiner/{A_full,B_no_prior,C_plain}/refiner.pth`，训练日志 `checkpoints/sr/ablation_refiner/train.log`。

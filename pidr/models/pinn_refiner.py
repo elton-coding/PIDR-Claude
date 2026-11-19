@@ -147,16 +147,23 @@ class PINNCSIReconstructor(nn.Module):
     - 最终输出 3 通道重建结果，并用 `tanh` 约束在 [-1, 1]。
     """
 
-    def __init__(self, base_channels: int = 32):
+    def __init__(self, base_channels: int = 32, use_prior: bool = True, use_coords: bool = True):
         """初始化网络结构。
 
         参数:
         - `base_channels`: 主干基础通道数，控制模型容量与计算量。
+        - `use_prior`: 是否输入可学习传播先验（3 通道，物理公式驱动）。消融实验用，默认开启。
+        - `use_coords`: 是否输入归一化坐标（2 通道）。消融实验用，默认开启。
+
+        默认参数与论文模型一致，已有权重的 state_dict 不受影响。
         """
         super().__init__()
-        self.prior = PropagationPrior()
+        self.use_prior = use_prior
+        self.use_coords = use_coords
+        if use_prior:
+            self.prior = PropagationPrior()
 
-        in_channels = 3 + 1 + 3 + 2
+        in_channels = 3 + 1 + (3 if use_prior else 0) + (2 if use_coords else 0)
 
         # 编码端：先进行两层同分辨率特征提取。
         self.enc = nn.Sequential(
@@ -194,10 +201,20 @@ class PINNCSIReconstructor(nn.Module):
         - 当 `return_aux=False`：返回 `pred`，形状 `[B, 3, H, W]`；
         - 当 `return_aux=True`：返回 `(pred, aux)`。
         """
-        # 构建可学习传播先验与坐标特征。
-        prior_feat, coords = self.prior(sparse_csi)
-        # 将观测信息、先验信息、位置信息全部拼接后送入主干网络。
-        x = torch.cat([sparse_csi, mask, prior_feat, coords], dim=1)
+        # 构建可学习传播先验与坐标特征（消融时可分别关闭）。
+        if self.use_prior:
+            prior_feat, coords = self.prior(sparse_csi)
+        else:
+            batch, _channels, height, width = sparse_csi.shape
+            prior_feat = None
+            coords = PropagationPrior._build_coords(batch, height, width, sparse_csi.device, sparse_csi.dtype)
+        # 将观测信息、先验信息、位置信息拼接后送入主干网络。
+        features = [sparse_csi, mask]
+        if self.use_prior:
+            features.append(prior_feat)
+        if self.use_coords:
+            features.append(coords)
+        x = torch.cat(features, dim=1)
 
         # 编码 + 下采样 + 瓶颈。
         skip = self.enc(x)
@@ -216,6 +233,8 @@ class PINNCSIReconstructor(nn.Module):
             return pred
 
         # 训练时可用的辅助量：先验特征、坐标、关键传播参数。
+        if not self.use_prior:
+            raise RuntimeError("return_aux needs the propagation prior (use_prior=True).")
         aux = {
             "prior_feat": prior_feat,
             "coords": coords,
