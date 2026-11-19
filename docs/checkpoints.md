@@ -75,3 +75,39 @@ checkpoints/
    Diffusion 和 PINN 两项来自另一次评估。
 6. **缺失率 0.95 一行** 使用的 refiner 是按缺失率 0.99 训练的（`rho0.95/refiner.pth`）。
 7. **`pidr_diffusion_0.8fd.pth`（已归档）** 在当前 `field.mat` 上输出无意义（NMSE −23 dB）。
+8. **半监督实验的测试输入密度随 α 变化。** 论文原文写测试条件与全监督相同（缺失率 80%），
+   实际评估时输入点比例为 α·η（α=0.1 时 5%，α=0.6 时 30%），只有 α=0.4 与全监督的 20% 相同。
+9. **refiner 训练时用测试集挑选最佳 epoch。** `train_pidr.py` 以测试集上的 missing-region MSE
+   保存最佳权重（掩码与评估相同），存在轻微的测试集泄漏。现有全部 PIDR 权重都是这样训练的。
+
+## 2026-11 论文修订记录
+
+| 位置 | 修改 | 依据 |
+|---|---|---|
+| 表 semisup α=0.5 | 1.307 / −40.128 / 0.946 → **1.269 / −41.205 / 0.953** | 用正确的 `alpha0.5` 权重重新评估（3 个种子：MSE 1.249–1.269） |
+| 图 semisup α=0.5 | 重新生成同一样本（1523） | 同上 |
+| 半监督实验描述 | 改为实际的测试输入密度 α·η；与全监督的比较改为 α=0.4 | 问题 8 |
+| 主表 RT（两张表） | 改为测试集结果：Diffusion −39.959 / PINN −37.143 / **PIDR-Net −41.887** | 论文所述协议；`results/method_comparison_sr/` |
+| 图 RT 定性对比 | 测试样本 1（排名与均值一致、PIDR-Net MSE 最接近中位数） | 同上 |
+| 主表 EM（EL） | 改为当前 `el.mat` 测试集结果：Diffusion −39.752 / PINN −41.569 / **PIDR-Net −45.274** | `results/method_comparison_el/` |
+| 图 EM 定性对比与描述 | 测试样本 6（同一标准）；描述改为平滑渐变 | 同上；原文“条纹”描述与原图也不符 |
+| 数据集描述、超参数表 | EM 数据集为 21×41、961 张图（训练 864 张） | 数据文件 |
+| 主表 FD | 改为测试集结果：Diffusion −41.532 / PINN −37.477 / **PIDR-Net −42.672**（SSIM 0.992） | 新训练的 refiner（`fd/pidr/`），见下文 |
+| 图 FD 定性对比与描述 | 测试样本 8（同一标准）；描述改为插值纹理与孤立深衰落 | `results/method_comparison_fd/` |
+| 跨数据集结论（第 859 行等） | 措辞对应三张新图 | 新图 |
+
+所有新数值都按论文其余部分的单位给出（增益 `10·log10|h|²`，即当前数据的 2 倍），
+因此 MSE 可与论文中其他表格直接比较。注意论文式 (3) 把增益定义为 `10·log10|h|`，
+与论文全部结果实际使用的单位不一致，这一问题在本次修订前就已存在。
+
+### FD refiner 重新训练
+
+原有 FD refiner 都是针对其他（较弱的）扩散模型的输出训练的，接在 `fd/baselines/diffusion.pth`
+之后反而会变差。2026-11 用 `scripts/train/train_fd_refiner_on_baseline.py` 以该扩散模型为冻结的第一阶段，
+按 `train_pidr.py` 的标准流程（1000 epochs，missing-region L1）重新训练 refiner：
+
+- 验证集 missing-region MSE（3 通道，归一化空间）：仅扩散 0.000530 → PIDR-Net 0.000378
+- 测试集（论文协议，增益通道）：NMSE −41.532 → −42.672 dB，SSIM 0.987 → 0.992
+- 权重：`checkpoints/fd/pidr/`，训练日志：`checkpoints/fd/pidr/refiner_train.log`
+
+与其他数据集一致，最佳 epoch 仍按测试集挑选（问题 9）。

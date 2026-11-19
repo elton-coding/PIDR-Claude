@@ -283,9 +283,11 @@ def run_benchmark() -> None:
     )
 
     device = Config.DEVICE
+    # Evaluate on the held-out test split (the paper's protocol). Before 2026-11 this read the
+    # training split, which is what the original main-table numbers were computed on.
     dataset = CSIGridDataset(
         Config.DATA_PATH,
-        mode="train",
+        mode="test",
         split_ratio=Config.DATA_SPLIT_RATIO,
         mask_seed=eval_mask_seed,
     )

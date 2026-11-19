@@ -89,14 +89,14 @@ python -m scripts.train.train_pidr
 
 | 论文章节 | 脚本 | 结果目录 |
 |---|---|---|
-| Results on Sionna RT / Cross dataset comparison | `scripts/eval/benchmark_methods.py` | `results/method_comparison_el/`（EL 行）|
+| Results on Sionna RT / Cross dataset comparison | `scripts/eval/benchmark_methods.py`（测试集） | `results/method_comparison_{sr,fd,el}/` |
 | Impact of different sampling strategies | `scripts/eval/benchmark_mask_strategies.py` | `results/mask_strategies_sr/` |
 | Impact of different masking ratios | `scripts/eval/benchmark_mask_ratios.py` | `results/mask_ratios_sr/` |
 | Impact of training measurement budget (α=0.1–0.6) | `scripts/train/train_pidr_semisupervised.py` + `scripts/eval/benchmark_semisupervised.py` | `results/semisupervised_sr/alpha_*/` |
 | MA position optimization, single user (L=4, 8) | `scripts/ma/generate_channel_maps.py` + `scripts/ma/ma_single_user.py` | `results/ma_single_user_sr/` |
 | MA position optimization, multi user (SR/FD/EL) | `scripts/ma/generate_channel_maps.py` + `scripts/ma/ma_multi_user.py` | `results/ma_multi_user/{sr,fd,el}/` |
 
-说明：论文主表中 SR 与 FD 两行的原始结果目录已不在磁盘上，只保留了生成它们的脚本。
+说明：主表已于 2026-11 按论文所述协议（测试集）重新评估，旧结果及其问题见 docs/checkpoints.md。
 各实验对应的权重及复核结论（包括 α=0.5 用错权重、FD 主表等问题）见 [docs/checkpoints.md](docs/checkpoints.md)。
 
 最终模型（用于 MA 实验）的完整推理/评估命令见 [docs/run_commands.md](docs/run_commands.md)。
@@ -117,7 +117,7 @@ PIDR_DATASET=sr python -m scripts.train.train_pidr
 | 预设 | 数据 | 网格 | 训练样本 | lr / epochs | 默认权重（`checkpoints/` 下：基线 / PIDR-Net） |
 |---|---|---|---|---|---|
 | `sr` | `data/sr.mat` | 32×32 | 9000 | 2e-4 / 1000 | `sr/baselines/` / `sr/pidr/` |
-| `fd` | `data/field.mat` | 32×32 | 9000 | 2e-4 / 1000 | `fd/baselines/` / `fd/pidr_cascade/` |
+| `fd` | `data/field.mat` | 32×32 | 9000 | 2e-4 / 1000 | `fd/baselines/` / `fd/pidr/` |
 | `el` | `data/el.mat` | 21×41 | 864 | 2e-5 / 30000 | `el/baselines/` / `el/pidr/` |
 
 `sr`、`fd` 使用论文超参数表；`el` 保留最后一次 EL 实验的设置（与整理前的默认值完全相同）。

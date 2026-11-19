@@ -44,7 +44,7 @@ DATASET_PRESETS = {
         "legacy_pidr_dir": "pidr_cascade",
     },
     # Same hyperparameters as SR; field.mat is also 32x32 with 10000 maps.
-    # fd/final (the MA model) has base channels 32, so the 64-channel pidr_cascade is the default.
+    # fd/pidr: refiner trained (2026-11) on the outputs of fd/baselines/diffusion.pth.
     "fd": {
         "data_path": "./data/field.mat",
         "img_height": 32,
@@ -54,7 +54,7 @@ DATASET_PRESETS = {
         "learning_rate": 2e-4,
         "num_epochs": 1000,
         "force_rebuild_cache": False,
-        "pidr_dir": "pidr_cascade",
+        "pidr_dir": "pidr",
         "legacy_pidr_dir": "pidr_cascade",
     },
     # EM simulation data: 21x41 grid, 961 maps (864 for training).
