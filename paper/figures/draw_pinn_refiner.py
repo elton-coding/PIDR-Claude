@@ -1,32 +1,48 @@
 """Draw the PIDR-Net refiner architecture (field response physics prior + residual refinement network).
 
 Writes the paper figure (pinn_refiner_architecture.pdf) and an editable PowerPoint version
-(pinn_refiner_architecture.pptx) from the same geometry. Every shape and text is recorded once and
-rendered by both back ends; in the .pptx all boxes, arrows and texts are native, editable objects
-(formulas are rich text with sub/superscripts), and only the CSI-map thumbnails are pictures.
+(pinn_refiner_architecture.pptx) from the same geometry and the same LaTeX labels:
+
+* PDF: every label is typeset by LaTeX (``text.usetex``), so the formulas use the paper's notation and
+  Computer Modern math; plain text is Helvetica.
+* PPTX: boxes, arrows and texts are native shapes; every ``$...$`` formula becomes a native Office Math
+  equation (editable in PowerPoint's equation editor, see pptx_math.py) with the LaTeX rendering as a
+  picture fallback for viewers without Office Math (e.g. LibreOffice). Only the CSI thumbnails are images.
 
 Equation numbers are read from paper/pidr_net.aux, so compile the paper first and rerun this script
 whenever the equations are renumbered.
 
-Thumbnails come from pinn_refiner_thumbnails.npz (Sionna RT test map 1, gain channel in dB), produced from
-checkpoints/sr/refiner_fr/FR/refiner.pth.  Run (repo root, needs python-pptx):
+Requirements: a LaTeX installation on PATH (latex, dvipng), python-pptx, latex2mathml, and Microsoft
+Office's MML2OMML.XSL (see pptx_math.py). Thumbnails come from pinn_refiner_thumbnails.npz (Sionna RT test
+map 1, gain channel in dB), produced from checkpoints/sr/refiner_fr/FR/refiner.pth. Run from the repo root:
     python paper/figures/draw_pinn_refiner.py
 """
 
 import re
+import sys
 from pathlib import Path
 
-import matplotlib.pyplot as plt
-import numpy as np
-from matplotlib.patches import FancyArrowPatch, FancyBboxPatch, Rectangle
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt  # noqa: E402
+import numpy as np  # noqa: E402
+from matplotlib.patches import FancyArrowPatch, FancyBboxPatch, Rectangle  # noqa: E402
 
 OUT_DIR = Path(__file__).resolve().parent
 PAPER_DIR = OUT_DIR.parent
 REPO = PAPER_DIR.parent
-BUILD_DIR = REPO / "runs" / "pinn_refiner_pptx"  # thumbnail PNGs for the .pptx
-plt.rcParams.update({"font.family": "DejaVu Sans", "mathtext.fontset": "dejavusans"})
+BUILD_DIR = REPO / "runs" / "pinn_refiner_pptx"  # thumbnail / fallback PNGs for the .pptx
+sys.path.insert(0, str(OUT_DIR))
 
-XMAX, YMAX = 21.0, 12.6  # drawing units
+plt.rcParams.update({
+    "text.usetex": True,
+    "font.family": "sans-serif",
+    "font.sans-serif": ["Helvetica"],
+    "text.latex.preamble": r"\usepackage{amsmath,amssymb,bm}",
+})
+
+XMAX, YMAX = 21.0, 12.6  # drawing units (0.5 inch each in the paper figure)
 
 C = {
     "ink": "#25313C",
@@ -57,41 +73,40 @@ def equation_numbers() -> dict:
     aux = PAPER_DIR / "pidr_net.aux"
     if not aux.exists():
         raise SystemExit("paper/pidr_net.aux not found: compile the paper first (latexmk in paper/).")
-    nums = {}
-    for m in re.finditer(r"\\newlabel\{(eq:[^}]+)\}\{\{([^}]+)\}", aux.read_text(encoding="utf-8")):
-        nums[m.group(1)] = m.group(2)
-    return nums
+    return {m.group(1): m.group(2) for m in
+            re.finditer(r"\\newlabel\{(eq:[^}]+)\}\{\{([^}]+)\}", aux.read_text(encoding="utf-8"))}
+
+
+def tex_bold(label):
+    """Bold for usetex (font weight is ignored by usetex)."""
+    return "\n".join(r"\textbf{" + line + "}" for line in label.split("\n"))
 
 
 class Scene:
     """Draws on a matplotlib axis and records every primitive for the PowerPoint export.
 
-    ``ppt`` arguments are rich-text markup for PowerPoint: ``_{..}`` subscript, ``^{..}`` superscript,
-    ``\\b{..}`` bold, ``\\i{..}`` italic, ``\\m{..}`` math font, ``\\{`` / ``\\}`` literal braces,
-    newline = new paragraph. Without ``ppt`` the plain text is used.
+    Labels are LaTeX (``$...$`` for math, ``\\n`` for a new line). ``ppt`` overrides the label in the
+    PowerPoint file (plain text, used for rotated block labels).
     """
 
     def __init__(self, ax):
         self.ax = ax
         self.items = []
 
-    def box(self, x, y, w, h, text, fill, edge, size=7.2, bold=False, rot=0, lw=1.0, rounding=0.08,
-            color=None, ppt=None, z=3):
+    def box(self, x, y, w, h, text, fill, edge, size=7.2, rot=0, lw=1.0, rounding=0.08, ppt=None, z=3):
         self.ax.add_patch(FancyBboxPatch((x, y), w, h, boxstyle=f"round,pad=0.02,rounding_size={rounding}",
                                          facecolor=fill, edgecolor=edge, linewidth=lw, zorder=z))
         if text:
             self.ax.text(x + w / 2, y + h / 2, text, ha="center", va="center", fontsize=size, rotation=rot,
-                         fontweight="bold" if bold else "normal", color=color or C["ink"], zorder=z + 1,
-                         linespacing=1.25)
-        self.items.append(dict(kind="box", x=x, y=y, w=w, h=h, ppt=ppt if ppt is not None else text, fill=fill,
-                               edge=edge, size=size, bold=bold, rot=rot, lw=lw, rounding=rounding,
-                               color=color or C["ink"]))
+                         color=C["ink"], zorder=z + 1, linespacing=1.25, multialignment="center")
+        self.items.append(dict(kind="box", x=x, y=y, w=w, h=h, label=ppt if ppt is not None else text, fill=fill,
+                               edge=edge, size=size, rot=rot, lw=lw, rounding=rounding))
 
-    def text(self, x, y, text, size=7.4, ha="center", va="center", color=None, bold=False, ppt=None):
-        self.ax.text(x, y, text, ha=ha, va=va, fontsize=size, color=color or C["ink"],
-                     fontweight="bold" if bold else "normal", linespacing=1.15, zorder=5)
-        self.items.append(dict(kind="text", x=x, y=y, ppt=ppt if ppt is not None else text, size=size, ha=ha,
-                               va=va, color=color or C["ink"], bold=bold))
+    def text(self, x, y, text, size=7.4, ha="center", va="center", color=None, bold=False):
+        self.ax.text(x, y, tex_bold(text) if bold else text, ha=ha, va=va, fontsize=size, color=color or C["ink"],
+                     linespacing=1.15, multialignment=ha if ha != "center" else "center", zorder=5)
+        self.items.append(dict(kind="text", x=x, y=y, label=text, size=size, ha=ha, va=va,
+                               color=color or C["ink"], bold=bold))
 
     def arrow(self, p, q, color=None, lw=1.0, cs="arc3"):
         self.ax.add_patch(FancyArrowPatch(p, q, arrowstyle="-|>", mutation_scale=8, linewidth=lw,
@@ -125,76 +140,34 @@ class Scene:
 
 
 # ---------------------------------------------------------------- PowerPoint export
-def parse_markup(s):
-    """Split PowerPoint markup into runs of (text, style dict); '\n' becomes a paragraph break run."""
-    runs = []
+def render_label_png(label, size_pt, color, ha, path, bold=False):
+    """Typeset a label with LaTeX to a tight transparent PNG; returns its size in inches."""
+    fig = plt.figure(figsize=(8, 2))
+    fig.text(0.5, 0.5, tex_bold(label) if bold else label, ha="center", va="center", fontsize=size_pt,
+             color=color, multialignment=ha if ha != "center" else "center", linespacing=1.15)
+    dpi = 600
+    # generous padding: the tight bbox of usetex text does not include accents above the first line
+    fig.savefig(path, dpi=dpi, transparent=True, bbox_inches="tight", pad_inches=0.05)
+    plt.close(fig)
+    from PIL import Image
 
-    def walk(t, style):
-        i, buf = 0, ""
-
-        def flush():
-            nonlocal buf
-            if buf:
-                runs.append((buf, dict(style)))
-                buf = ""
-
-        while i < len(t):
-            ch = t[i]
-            if ch == "\\" and i + 1 < len(t) and t[i + 1] in "{}":
-                buf += t[i + 1]
-                i += 2
-                continue
-            tag = None
-            if t.startswith(("\\b{", "\\i{", "\\m{"), i):
-                tag, start = t[i + 1], i + 3
-            elif t.startswith(("_{", "^{"), i):
-                tag, start = t[i], i + 2
-            if tag:
-                depth, j = 1, start
-                while depth:
-                    if t[j] == "\\" and t[j + 1] in "{}":
-                        j += 2
-                        continue
-                    depth += {"{": 1, "}": -1}.get(t[j], 0)
-                    j += 1
-                flush()
-                sub = dict(style)
-                sub.update({"b": {"bold": True}, "i": {"italic": True}, "m": {"math": True},
-                            "_": {"base": -25000}, "^": {"base": 30000}}[tag])
-                walk(t[start:j - 1], sub)
-                i = j
-                continue
-            if ch == "\n":
-                flush()
-                runs.append(("\n", {}))
-                i += 1
-                continue
-            buf += ch
-            i += 1
-        flush()
-
-    walk(s, {})
-    return runs
-
-
-def mathtext_to_plain(s):
-    """Fallback for labels given only as matplotlib text: strip $ and simple TeX."""
-    s = s.replace("$", "")
-    for a, b in [(r"\times", "×"), (r"\Delta", "Δ"), ("\\", "")]:
-        s = s.replace(a, b)
-    return s
+    with Image.open(path) as im:
+        return im.size[0] / dpi, im.size[1] / dpi
 
 
 def to_pptx(scene, path):
     from pptx import Presentation
     from pptx.dml.color import RGBColor
+    from pptx.enum.dml import MSO_LINE_DASH_STYLE
     from pptx.enum.shapes import MSO_CONNECTOR, MSO_SHAPE
     from pptx.enum.text import MSO_ANCHOR, PP_ALIGN
     from pptx.oxml.ns import qn
-    from pptx.util import Emu, Inches, Pt
+    from pptx.util import Inches, Pt
+
+    from pptx_math import fill_paragraphs, wrap_with_fallback
 
     unit = 0.625  # inches per drawing unit
-    fscale = unit / 0.5  # the matplotlib figure uses 0.5 inch per unit
+    fscale = unit / 0.5  # the paper figure uses 0.5 inch per unit
     prs = Presentation()
     EXL, EXR, EYB, EYT = -0.35, XMAX + 0.15, -0.6, YMAX + 0.15  # slide extent with margins (drawing units)
     prs.slide_width, prs.slide_height = Inches((EXR - EXL) * unit), Inches((EYT - EYB) * unit)
@@ -205,28 +178,12 @@ def to_pptx(scene, path):
     L = lambda v: Inches(v * unit)  # noqa: E731  (length)
     rgb = lambda h: RGBColor.from_string(h.lstrip("#").upper())  # noqa: E731
     BUILD_DIR.mkdir(parents=True, exist_ok=True)
+    ALIGN = {"left": "l", "center": "ctr", "right": "r"}
 
-    def fill_text(tf, markup, size, color, bold=False, align=PP_ALIGN.CENTER):
+    def plain_text(tf, label, size, color, bold=False, align="center"):
         tf.word_wrap = False
         tf.margin_left = tf.margin_right = tf.margin_top = tf.margin_bottom = 0
-        runs = parse_markup(markup if "$" not in markup else mathtext_to_plain(markup))
-        para = tf.paragraphs[0]
-        para.alignment = align
-        for text, st in runs:
-            if text == "\n":
-                para = tf.add_paragraph()
-                para.alignment = align
-                continue
-            r = para.add_run()
-            r.text = text
-            f = r.font
-            f.size = Pt(round(size * fscale * 2) / 2)
-            f.bold = bold or st.get("bold", False)
-            f.italic = st.get("italic", False)
-            f.name = "Cambria Math" if st.get("math") else "Arial"
-            f.color.rgb = rgb(color)
-            if "base" in st:
-                f._element.set("baseline", str(st["base"]))
+        fill_paragraphs(tf._txBody, label, size * fscale, color, bold=bold, align=ALIGN[align])
 
     def connector(x1, y1, x2, y2, color, lw, head):
         c = shapes.add_connector(MSO_CONNECTOR.STRAIGHT, X(x1), Y(y1), X(x2), Y(y2))
@@ -234,9 +191,7 @@ def to_pptx(scene, path):
         c.line.width = Pt(lw)
         if head:
             ln = c.line._get_or_add_ln()
-            tail = ln.makeelement(qn("a:tailEnd"), {"type": "triangle", "w": "med", "len": "med"})
-            ln.append(tail)
-        return c
+            ln.append(ln.makeelement(qn("a:tailEnd"), {"type": "triangle", "w": "med", "len": "med"}))
 
     for n, it in enumerate(scene.items):
         k = it["kind"]
@@ -252,30 +207,34 @@ def to_pptx(scene, path):
             sh.fill.fore_color.rgb = rgb(it["fill"])
             sh.line.color.rgb = rgb(it["edge"])
             sh.line.width = Pt(it["lw"])
-            sh.shadow.inherit = False
-            tf = sh.text_frame
-            tf.vertical_anchor = MSO_ANCHOR.MIDDLE
-            if it["ppt"]:
-                fill_text(tf, it["ppt"], it["size"], it["color"], it["bold"])
+            sh.text_frame.vertical_anchor = MSO_ANCHOR.MIDDLE
+            if it["label"]:
+                plain_text(sh.text_frame, it["label"], it["size"], C["ink"])
         elif k == "text":
-            lines = it["ppt"].count("\n") + 1
-            h = lines * it["size"] * 1.3 / 72 / 0.5  # in drawing units (figure scale)
-            w = 8.0
+            label = it["label"]
+            if "$" in label:  # size the box to the LaTeX rendering, which is also the fallback picture
+                png = BUILD_DIR / f"label_{n:03d}.png"
+                w_in, h_in = render_label_png(label, it["size"] * fscale, it["color"], it["ha"], png, it["bold"])
+                w, h = w_in / unit, h_in / unit
+            else:
+                png, w = None, 8.0
+                h = (label.count("\n") + 1) * it["size"] * 1.3 / 72 / 0.5
             xl = {"left": it["x"], "center": it["x"] - w / 2, "right": it["x"] - w}[it["ha"]]
             ytop = {"top": it["y"], "center": it["y"] + h / 2, "bottom": it["y"] + h}[it["va"]]
             tb = shapes.add_textbox(X(xl), Y(ytop), L(w), L(h))
             tb.text_frame.vertical_anchor = {"top": MSO_ANCHOR.TOP, "center": MSO_ANCHOR.MIDDLE,
                                              "bottom": MSO_ANCHOR.BOTTOM}[it["va"]]
-            align = {"left": PP_ALIGN.LEFT, "center": PP_ALIGN.CENTER, "right": PP_ALIGN.RIGHT}[it["ha"]]
-            fill_text(tb.text_frame, it["ppt"], it["size"], it["color"], it["bold"], align)
+            plain_text(tb.text_frame, label, it["size"], it["color"], it["bold"], it["ha"])
+            if png is not None:
+                pic = shapes.add_picture(str(png), X(xl), Y(ytop), L(w), L(h))
+                wrap_with_fallback(tb._element, pic._element)
         elif k == "arrow":
             connector(*it["p"], *it["q"], it["color"], it["lw"], head=True)
         elif k == "line":
-            for (x1, y1), (x2, y2) in zip(zip(it["xs"], it["ys"]), zip(it["xs"][1:], it["ys"][1:])):
-                connector(x1, y1, x2, y2, it["color"], it["lw"], head=False)
+            for (xa, ya), (xb, yb) in zip(zip(it["xs"], it["ys"]), zip(it["xs"][1:], it["ys"][1:])):
+                connector(xa, ya, xb, yb, it["color"], it["lw"], head=False)
         elif k == "rect":
             sh = shapes.add_shape(MSO_SHAPE.RECTANGLE, X(it["x"]), Y(it["y"] + it["h"]), L(it["w"]), L(it["h"]))
-            sh.shadow.inherit = False
             if it["fill"]:
                 sh.fill.solid()
                 sh.fill.fore_color.rgb = rgb(it["fill"])
@@ -284,32 +243,30 @@ def to_pptx(scene, path):
             sh.line.color.rgb = rgb(it["edge"])
             sh.line.width = Pt(it["lw"])
             if it["dashed"]:
-                from pptx.enum.dml import MSO_LINE_DASH_STYLE
                 sh.line.dash_style = MSO_LINE_DASH_STYLE.DASH
         elif k == "circle":
             (cx, cy), r = it["center"], it["r"]
             sh = shapes.add_shape(MSO_SHAPE.OVAL, X(cx - r), Y(cy + r), L(2 * r), L(2 * r))
-            sh.shadow.inherit = False
             sh.fill.solid()
             sh.fill.fore_color.rgb = rgb("#FFFFFF")
             sh.line.color.rgb = rgb(C["ink"])
             sh.line.width = Pt(1.0)
             sh.text_frame.vertical_anchor = MSO_ANCHOR.MIDDLE
-            fill_text(sh.text_frame, it["text"], it["size"], C["ink"])
+            plain_text(sh.text_frame, it["text"], it["size"], C["ink"])
         elif k == "image":
             img = np.ma.masked_invalid(it["img"])
             big = np.kron(img.filled(np.nan), np.ones((10, 10)))  # nearest-neighbour upscale: no smoothing in PPT
-            png = BUILD_DIR / f"thumb_{n:02d}.png"
+            png = BUILD_DIR / f"thumb_{n:03d}.png"
             plt.imsave(png, np.ma.masked_invalid(big), cmap=it["cmap"], vmin=it["vmin"], vmax=it["vmax"])
             shapes.add_picture(str(png), X(it["x"]), Y(it["y"] + it["s"]), L(it["s"]), L(it["s"]))
             fr = shapes.add_shape(MSO_SHAPE.RECTANGLE, X(it["x"]), Y(it["y"] + it["s"]), L(it["s"]), L(it["s"]))
             fr.fill.background()
-            fr.shadow.inherit = False
             fr.line.color.rgb = rgb("#8C8C8C")
             fr.line.width = Pt(0.5)
-    # drop the theme style references python-pptx adds (shadow/effect, white font); colors are explicit
+    # drop the theme style references python-pptx adds (shadow/effects, white font); colors are explicit
     for el in list(slide.shapes._spTree.iter(qn("p:style"))):
         el.getparent().remove(el)
+    _ = PP_ALIGN  # alignment is written by pptx_math.fill_paragraphs
     prs.save(path)
 
 
@@ -322,7 +279,7 @@ def main() -> None:
     sparse = np.ma.masked_invalid(d["sparse"])
     coords = np.linspace(0, 1, 32)[None, :] * np.ones((32, 1))
 
-    fig, ax = plt.subplots(figsize=(10.5, 6.3))
+    fig, ax = plt.subplots(figsize=(XMAX / 2, YMAX / 2))
     ax.set_xlim(0, XMAX)
     ax.set_ylim(0, YMAX)
     ax.axis("off")
@@ -332,19 +289,17 @@ def main() -> None:
     s = 1.55
     xin = 0.25
     inputs = [
-        (9.75, d["diffusion"], "jet", 2, r"$\widehat{\mathbf{X}}^{\mathrm{diff}}$ coarse" + "\nreconstruction (3 ch)",
-         "\\m{\\b{X\u0302}^{diff}} coarse\nreconstruction (3 ch)"),
-        (6.75, sparse, "jet", 0, r"Measurements $\widetilde{\mathbf{X}}^{I}$," + "\n" + r"mask $\mathbf{M}^{I}$ (1 ch)",
-         "Measurements \\m{\\b{X\u0303}^{\\i{I}}},\nmask \\m{\\b{M}^{\\i{I}}} (1 ch)"),
-        (1.05, coords, "Greys", 1, "Coordinates\n" + r"$\mathbf{C}$ (2 ch), " + E("eq:coordinate_tensor"),
-         "Coordinates\n\\m{\\b{C}} (2 ch), " + E("eq:coordinate_tensor")),
+        (9.75, d["diffusion"], "jet", 2, r"$\widehat{\mathbf{X}}^{\mathrm{diff}}$ coarse" + "\n"
+         + "reconstruction (3 ch)"),
+        (6.75, sparse, "jet", 0, r"Measurements $\widetilde{\mathbf{X}}^{I}$," + "\n" + r"mask $\mathbf{M}^{I}$ (1 ch)"),
+        (1.05, coords, "Greys", 1, "Coordinates\n" + r"$\mathbf{C}$ (2 ch), " + E("eq:coordinate_tensor")),
     ]
-    for y, img, cmap, st, label, ppt in inputs:
+    for y, img, cmap, st, label in inputs:
         if cmap == "jet":
             S.thumb(img, xin, y, s, cmap, vmin, vmax, stack=st)
         else:
             S.thumb(img, xin, y, s, cmap, 0, 1, stack=st, stack_colors=["#F3E3BF"])
-        S.text(xin + s / 2, y - 0.18, label, va="top", ppt=ppt)
+        S.text(xin + s / 2, y - 0.18, label, va="top")
 
     # ---------------- physics prior panel (top) ----------------
     px, py, pw, ph = 3.0, 8.05, 17.75, 4.35
@@ -353,41 +308,38 @@ def main() -> None:
            size=9.0, ha="left", bold=True)
 
     bh, by = 1.55, 9.55
-    xs, ws = [3.3, 7.2, 11.1], [3.5, 3.5, 4.05]
+    xs, ws = [3.3, 6.95, 10.6], [3.25, 3.25, 4.6]
     steps = [
         ("Wavenumber spectrum " + E("eq:fr_spectrum"),
-         r"$\Psi\propto|\mathcal{F}_{2N}\{\hat h^{\mathrm{diff}}\}|^{2}$",
-         "\\m{Ψ ∝ |ℱ_{2\\i{N}}\\{\\i{h\u0302}^{diff}\\}|^{2}}"),
+         r"$\Psi\propto\left|\mathcal{F}_{2N}\{\hat{h}^{\mathrm{diff}}\}\right|^{2}$"),
         ("Plane-wave covariance " + E("eq:fr_kernel"),
-         r"$\Gamma(\mathbf{d})=\mathcal{F}^{-1}_{2N}\{\Psi\}(\mathbf{d})$",
-         "\\m{Γ(\\b{d}) = ℱ^{−1}_{2\\i{N}}\\{Ψ\\}(\\b{d})}"),
+         r"$\Gamma(\mathbf{d})=\mathcal{F}^{-1}_{2N}\{\Psi\}(\mathbf{d})$"),
         ("LMMSE from measurements " + E("eq:fr_lmmse"),
-         r"$\hat h^{\mathrm{fr}}=\mathbf{\Gamma}_{q,\mathcal{A}}(\mathbf{\Gamma}_{\mathcal{A}\mathcal{A}}+\delta^{2}\mathbf{I})^{-1}\mathbf{y}$",
-         "\\m{\\i{h\u0302}^{fr} = \\b{Γ}_{\\i{q},𝒜}(\\b{Γ}_{𝒜𝒜} + \\i{δ}^{2}\\b{I})^{−1}\\b{y}}"),
+         r"$\hat{h}^{\mathrm{fr}}=\mathbf{\Gamma}_{q,\mathcal{A}_{\mathrm{in}}}"
+         r"(\mathbf{\Gamma}_{\mathcal{A}_{\mathrm{in}}\mathcal{A}_{\mathrm{in}}}+\delta^{2}\mathbf{I})^{-1}\mathbf{y}$"),
     ]
-    for x, w, (title, formula, formula_ppt) in zip(xs, ws, steps):
+    for x, w, (title, formula) in zip(xs, ws, steps):
         S.box(x, by, w, bh, "", C["phys"], C["phys_edge"])
-        S.text(x + w / 2, by + 0.70 * bh, title, size=6.6)
-        S.text(x + w / 2, by + 0.32 * bh, formula, size=7.3, ppt=formula_ppt)
+        S.text(x + w / 2, by + 0.71 * bh, title, size=6.6)
+        S.text(x + w / 2, by + 0.31 * bh, formula, size=7.3)
     S.arrow((xs[0] + ws[0], by + bh / 2), (xs[1], by + bh / 2))
     S.arrow((xs[1] + ws[1], by + bh / 2), (xs[2], by + bh / 2))
-    S.text(xs[0] + ws[0] / 2, by - 0.32, r"$\hat h^{\mathrm{diff}}=\hat X^{\mathrm{re}}+j\hat X^{\mathrm{im}}$",
-           size=7.0, color=C["muted"],
-           ppt="\\m{\\i{h\u0302}^{diff} = \\i{X\u0302}^{re} + \\i{j}\\i{X\u0302}^{im}}")
+    S.text(xs[0] + ws[0] / 2, by - 0.32,
+           r"$\hat{h}^{\mathrm{diff}}=\widehat{X}^{\mathrm{re}}+j\widehat{X}^{\mathrm{im}}$", size=7.0,
+           color=C["muted"])
     x3c, x3r = xs[2] + ws[2] / 2, xs[2] + ws[2]
-    S.text(x3c, by - 0.32, r"$\mathbf{y}$: measured complex CSI on $\mathcal{A}_{\mathrm{in}}$",
-           size=7.0, color=C["muted"], ppt="\\m{\\b{y}}: measured complex CSI on \\m{𝒜_{in}}")
+    S.text(x3c, by - 0.32, r"$\mathbf{y}$: measured complex CSI on $\mathcal{A}_{\mathrm{in}}$", size=7.0,
+           color=C["muted"])
 
     # outputs of the physics prior
     ts = 1.3
     ox = 16.05
     S.thumb(d["physics"], ox, 10.55, ts, "jet", vmin, vmax, stack=2)
     S.thumb(d["logvar"], ox, 8.55, ts, "viridis", -1, 1)
-    S.text(ox + ts + 0.35, 10.55 + ts / 2, r"Physics estimate" + "\n" + r"$\widehat{\mathbf{X}}^{\mathrm{fr}}$ (3 ch)",
-           ha="left", ppt="Physics estimate\n\\m{\\b{X\u0302}^{fr}} (3 ch)")
+    S.text(ox + ts + 0.35, 10.55 + ts / 2, "Physics estimate\n" + r"$\widehat{\mathbf{X}}^{\mathrm{fr}}$ (3 ch)",
+           ha="left")
     S.text(ox + ts + 0.35, 8.55 + ts / 2,
-           "Confidence " + r"$\mathbf{V}$" + " (1 ch)" + "\nposterior variance " + E("eq:fr_variance"),
-           ha="left", ppt="Confidence \\m{\\b{V}} (1 ch)\nposterior variance " + E("eq:fr_variance"))
+           r"Confidence $\mathbf{V}$ (1 ch)" + "\nposterior variance " + E("eq:fr_variance"), ha="left")
     S.arrow((x3r, by + bh / 2 + 0.25), (ox - 0.05, 10.55 + ts / 2), cs="arc3,rad=-0.15")
     S.arrow((x3r, by + bh / 2 - 0.25), (ox - 0.05, 8.55 + ts / 2), cs="arc3,rad=0.15")
 
@@ -417,27 +369,26 @@ def main() -> None:
     S.line([3.65, ox + ts / 2], [7.75, 7.75])
     S.line([3.65, 3.65], [7.75, 4.4])
     S.arrow((3.65, 4.4), (cx + cw, 4.4))
-    S.text(4.3, 7.78, r"$\widehat{\mathbf{X}}^{\mathrm{fr}}$, $\mathbf{V}$", size=6.8, color=C["muted"], ha="left",
-           va="bottom", ppt="\\m{\\b{X\u0302}^{fr}}, \\m{\\b{V}}")
+    S.text(4.3, 7.8, r"$\widehat{\mathbf{X}}^{\mathrm{fr}}$, $\mathbf{V}$", size=6.8, color=C["muted"], ha="left",
+           va="bottom")
 
     # ---------------- refinement backbone ----------------
     col_w = 0.62
     blocks = [
-        # x, w, y, h, text, fill, channels
-        (4.35, col_w, 1.15, 5.7, "Conv-BN-ReLU", "cbr", 10),
-        (5.25, col_w, 1.6, 4.8, "Conv-BN-ReLU", "cbr", 32),
-        (6.55, col_w, 1.9, 4.2, r"3$\times$3 Conv, stride 2", "down", 32),
-        (7.85, col_w, 2.3, 3.4, "Conv-BN-ReLU", "cbr", 64),
-        (8.75, col_w, 2.3, 3.4, "Conv-BN-ReLU", "cbr", 64),
-        (10.05, col_w, 2.3, 3.4, "Bilinear upsample", "interp", 64),
-        (10.95, col_w, 1.9, 4.2, r"3$\times$3 Conv", "up", 32),
-        (12.25, col_w, 1.6, 4.8, "Conv-BN-ReLU", "cbr", 64),
-        (13.15, col_w, 1.6, 4.8, "Conv-BN-ReLU", "cbr", 32),
-        (14.45, col_w, 1.9, 4.2, r"1$\times$1 Conv (zero init.)", "out", 32),
+        # x, w, y, h, LaTeX label, plain label for PowerPoint, fill, channels
+        (4.35, col_w, 1.15, 5.4, "Conv-BN-ReLU", None, "cbr", 10),
+        (5.25, col_w, 1.6, 4.8, "Conv-BN-ReLU", None, "cbr", 32),
+        (6.55, col_w, 1.9, 4.2, r"3$\times$3 Conv, stride 2", "3×3 Conv, stride 2", "down", 32),
+        (7.85, col_w, 2.3, 3.4, "Conv-BN-ReLU", None, "cbr", 64),
+        (8.75, col_w, 2.3, 3.4, "Conv-BN-ReLU", None, "cbr", 64),
+        (10.05, col_w, 2.3, 3.4, "Bilinear upsample", None, "interp", 64),
+        (10.95, col_w, 1.9, 4.2, r"3$\times$3 Conv", "3×3 Conv", "up", 32),
+        (12.25, col_w, 1.6, 4.8, "Conv-BN-ReLU", None, "cbr", 64),
+        (13.15, col_w, 1.6, 4.8, "Conv-BN-ReLU", None, "cbr", 32),
+        (14.45, col_w, 1.9, 4.2, r"1$\times$1 Conv (zero init.)", "1×1 Conv (zero init.)", "out", 32),
     ]
-    for x, w, y, h, text, key, ch in blocks:
-        S.box(x, y, w, h, text, C[key], C[key + "_edge"], size=7.0, rot=90, rounding=0.12,
-              ppt=mathtext_to_plain(text))
+    for x, w, y, h, text, plain, key, ch in blocks:
+        S.box(x, y, w, h, text, C[key], C[key + "_edge"], size=7.0, rot=90, rounding=0.12, ppt=plain)
         S.text(x + w / 2, y + h + 0.2, str(ch), size=7.8, va="bottom", bold=True)
     mid = 4.0
     S.arrow((cx + cw, mid), (4.35, mid))
@@ -460,13 +411,12 @@ def main() -> None:
     ax_c = (15.75, mid)
     S.arrow((14.45 + col_w, mid), (ax_c[0] - 0.22, mid))
     S.circle(ax_c, 0.22, "+")
-    S.text(15.2, mid + 0.18, r"$\Delta$", size=7.6, va="bottom", ppt="\\m{Δ}")
+    S.text(15.2, mid + 0.18, r"$\Delta$", size=7.6, va="bottom")
     S.line([ox + ts + 0.25, 17.6], [10.55 + ts / 2 - 0.25, 10.55 + ts / 2 - 0.25], color=C["muted"])
     S.line([17.6, 17.6], [10.55 + ts / 2 - 0.25, 7.45], color=C["muted"])
     S.line([15.75, 17.6], [7.45, 7.45], color=C["muted"])
     S.arrow((15.75, 7.45), (15.75, mid + 0.22), color=C["muted"])
-    S.text(15.85, 6.6, r"$\widehat{\mathbf{X}}^{\mathrm{fr}}$", ha="left", color=C["muted"],
-           ppt="\\m{\\b{X\u0302}^{fr}}")
+    S.text(15.85, 6.6, r"$\widehat{\mathbf{X}}^{\mathrm{fr}}$", ha="left", color=C["muted"])
     S.box(16.45, 1.9, col_w, 4.2,
           r"clip $[-1,1]$ " + E("eq:pinn_output") + "\nrestore measured " + E("eq:final_estimator"),
           C["out"], C["out_edge"], size=7.0, rot=90, rounding=0.12,
@@ -481,6 +431,7 @@ def main() -> None:
 
     fig.savefig(OUT_DIR / "pinn_refiner_architecture.pdf", bbox_inches="tight", pad_inches=0.03)
     fig.savefig(REPO / "runs" / "pinn_refiner_architecture_preview.png", dpi=160, bbox_inches="tight")
+    plt.close(fig)
     print("saved", OUT_DIR / "pinn_refiner_architecture.pdf")
     to_pptx(S, OUT_DIR / "pinn_refiner_architecture.pptx")
     print("saved", OUT_DIR / "pinn_refiner_architecture.pptx")
