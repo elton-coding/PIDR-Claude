@@ -13,14 +13,21 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import numpy as np
 import torch
 from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 
+from pidr.models.field_response import (
+    apply_field_response,
+    calibrate_field_response,
+    configure_field_response,
+    estimate_global_psd,
+)
 from pidr.models.pinn_refiner import PINNCSIReconstructor
+from scripts.train.train_pidr import TensorBatches
 from pidr.config import Config
 from pidr.data import CSIGridDataset
 from pidr.diffusion import DiffusionManager
@@ -210,9 +217,10 @@ def sample_physics_guided(
 class DiffusionReconDataset(Dataset):
     """Attach cached diffusion reconstructions to a partial-supervision dataset."""
 
-    def __init__(self, base: Dataset, diffusion_recon: torch.Tensor):
+    def __init__(self, base: Dataset, diffusion_recon: torch.Tensor, physics: Optional[torch.Tensor] = None):
         self.base = base
         self.diffusion_recon = diffusion_recon
+        self.physics = physics
 
         if len(self.base) != int(self.diffusion_recon.shape[0]):
             raise ValueError(
@@ -225,6 +233,8 @@ class DiffusionReconDataset(Dataset):
     def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:
         item = self.base[idx]
         item["diffusion_recon"] = self.diffusion_recon[idx]
+        if self.physics is not None:
+            item["physics"] = self.physics[idx]
         return item
 
 
@@ -408,6 +418,35 @@ def train_diffusion_stage(
             )
 
 
+def _stack(dataset: Dataset, key: str) -> torch.Tensor:
+    return torch.stack([dataset[i][key] for i in range(len(dataset))])
+
+
+def prepare_field_response_partial(refiner, train_dataset, test_dataset, diff_train, diff_test):
+    """Calibrate the field-response layer without complete maps and precompute its outputs.
+
+    Only what the partial-supervision setting provides is used: the dataset wavenumber spectrum is
+    estimated from the diffusion reconstructions of the training maps (which depend only on the input
+    points), and the LMMSE hyper-parameters are chosen by the gain error on the held-out supervision
+    points of the training maps.
+    """
+    layer = refiner.prior
+    lo = torch.tensor(train_dataset.global_min, dtype=torch.float64).view(1, 3, 1, 1)
+    hi = torch.tensor(train_dataset.global_max, dtype=torch.float64).view(1, 3, 1, 1)
+    phys = (diff_train.double() + 1) / 2 * (hi - lo) + lo
+    psd = estimate_global_psd(torch.complex(phys[:, 1], phys[:, 2]), Config.IMG_HEIGHT, Config.IMG_WIDTH)
+    configure_field_response(layer, train_dataset.global_min, train_dataset.global_max, global_psd=psd)
+    input_mask_train = _stack(train_dataset, "input_mask")
+    calib = calibrate_field_response(
+        layer, diff_train, input_mask_train, _stack(train_dataset, "available_csi"),
+        eval_mask=_stack(train_dataset, "supervision_mask"),
+    )
+    print(f"[Partial-PIDR-Refiner] field-response calibration (train supervision points): {calib}", flush=True)
+    phys_train = apply_field_response(layer, diff_train, input_mask_train)
+    phys_test = apply_field_response(layer, diff_test, _stack(test_dataset, "input_mask"))
+    return phys_train, phys_test
+
+
 def train_refiner_stage(
     *,
     device: str,
@@ -415,7 +454,11 @@ def train_refiner_stage(
     num_epochs: int,
     sample_stride: int,
     force_rebuild_cache: bool,
+    refiner_kwargs: Optional[Dict[str, Any]] = None,
 ) -> None:
+    """Refiner stage; ``refiner_kwargs`` selects the variant (default ``Config.PIDR.REFINER_KWARGS``)."""
+    if refiner_kwargs is None:
+        refiner_kwargs = dict(Config.PIDR.REFINER_KWARGS)
     if not os.path.exists(paths.diffusion_ckpt):
         raise FileNotFoundError(f"Diffusion checkpoint is required for the refiner stage: {paths.diffusion_ckpt}")
 
@@ -435,7 +478,7 @@ def train_refiner_stage(
         diffusion_model=diffusion_model,
         diffusion_ckpt_path=paths.diffusion_ckpt,
         device=device,
-        batch_size=Config.BATCH_SIZE,
+        batch_size=Config.PIDR.CACHE_BATCH_SIZE,
         sample_stride=sample_stride,
         force_rebuild=force_rebuild_cache,
     )
@@ -446,18 +489,23 @@ def train_refiner_stage(
         diffusion_model=diffusion_model,
         diffusion_ckpt_path=paths.diffusion_ckpt,
         device=device,
-        batch_size=Config.BATCH_SIZE,
+        batch_size=Config.PIDR.CACHE_BATCH_SIZE,
         sample_stride=sample_stride,
         force_rebuild=force_rebuild_cache,
     )
 
-    train_ds = DiffusionReconDataset(train_dataset, diff_train)
-    test_ds = DiffusionReconDataset(test_dataset, diff_test)
+    refiner = PINNCSIReconstructor(height=Config.IMG_HEIGHT, width=Config.IMG_WIDTH, **refiner_kwargs).to(device)
+    print(f"[Partial-PIDR-Refiner] variant: {refiner_kwargs}", flush=True)
+    phys_train = phys_test = None
+    if refiner.prior_type == "field_response":
+        phys_train, phys_test = prepare_field_response_partial(refiner, train_dataset, test_dataset, diff_train, diff_test)
 
-    train_loader = DataLoader(train_ds, batch_size=Config.BATCH_SIZE, shuffle=True)
-    test_loader = DataLoader(test_ds, batch_size=Config.BATCH_SIZE, shuffle=False)
+    train_ds = DiffusionReconDataset(train_dataset, diff_train, phys_train)
+    test_ds = DiffusionReconDataset(test_dataset, diff_test, phys_test)
 
-    refiner = PINNCSIReconstructor().to(device)
+    # Splits are fixed per sample, so the whole split is materialised once on the device.
+    train_loader = TensorBatches(train_ds, Config.BATCH_SIZE, shuffle=True, device=device)
+    test_loader = TensorBatches(test_ds, Config.BATCH_SIZE, shuffle=False, device=device)
     optimizer = torch.optim.AdamW(refiner.parameters(), lr=Config.LEARNING_RATE)
 
     best_val = float("inf")
@@ -476,7 +524,7 @@ def train_refiner_stage(
             supervision_mask = batch["supervision_mask"].to(device)
             diffusion_recon = batch["diffusion_recon"].to(device)
 
-            pred = refiner(diffusion_recon, input_mask)
+            pred = refiner(diffusion_recon, input_mask, physics=batch.get("physics"))
             pred = pred * (1 - input_mask) + input_csi * input_mask
 
             loss = masked_region_l1(pred, target, supervision_mask)
@@ -502,7 +550,7 @@ def train_refiner_stage(
                 supervision_mask = batch["supervision_mask"].to(device)
                 diffusion_recon = batch["diffusion_recon"].to(device)
 
-                pred = refiner(diffusion_recon, input_mask)
+                pred = refiner(diffusion_recon, input_mask, physics=batch.get("physics"))
                 pred = pred * (1 - input_mask) + input_csi * input_mask
                 val_metric += float(masked_region_mse(pred, target, supervision_mask).item())
 

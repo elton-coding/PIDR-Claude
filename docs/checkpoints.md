@@ -15,13 +15,15 @@ checkpoints/
 ├── MANIFEST.csv                       # 唯一的权重登记表
 ├── <dataset>/                         # sr | fd | el
 │   ├── baselines/{diffusion,pinn}.pth # 单独的 Diffusion / PINN 基线
-│   ├── pidr/{diffusion,refiner}.pth   # 该数据集主表中的 PIDR-Net
-│   ├── pidr_cascade/...               # 4 月的级联版 PIDR（采样策略实验）
+│   ├── pidr/{diffusion,refiner}.pth   # 论文 PIDR-Net（主表、采样策略、MA；refiner 为场响应 FR）
+│   ├── pidr_cascade/...               # 4 月的级联版 PIDR（v13 采样策略实验，论文已不用）
 │   ├── mask_ratio/rho0.70/...         # 缺失率实验，每个设置一个子目录
 │   ├── semisup/alpha0.1/...           # 半监督实验，每个 α 一个子目录
-│   ├── final/...                      # MA 实验用的最终模型（含 refiner.metadata.json）
+│   ├── refiner_fr/...                 # 场响应 refiner 及其消融（FR/NP，各 3 个 seed）
+│   ├── final/...                      # v13 MA 实验用的模型（含 refiner.metadata.json）
 │   └── legacy_dataset/...             # 仅 el：针对已不存在的旧版 EL 数据训练的权重
 └── archive/                           # 论文未使用的权重，保留原文件名，确认后可删除
+    └── radial_v13/<原路径>            # 被 FR refiner 替换的 v13 refiner（2026-11）
 ```
 
 规则：
@@ -113,9 +115,40 @@ checkpoints/
 
 - 验证集 missing-region MSE（3 通道，归一化空间）：仅扩散 0.000530 → PIDR-Net 0.000378
 - 测试集（论文协议，增益通道）：NMSE −41.532 → −42.672 dB，SSIM 0.987 → 0.992
-- 权重：`checkpoints/fd/pidr/`，训练日志：`checkpoints/fd/pidr/refiner_train.log`
+- 权重：`checkpoints/archive/radial_v13/fd/pidr/refiner.pth`（已被 FR refiner 替换），训练日志在同目录 `refiner_train.log`
 
 与其他数据集一致，最佳 epoch 仍按测试集挑选（问题 9）。
+
+## 2026-11 论文改用场响应 refiner
+
+论文中 PIDR-Net 的 refiner 已从 v13 的径向传播先验（`prior="radial"`）换成场响应 LMMSE 物理先验
+（`prior="field_response"`, `residual="physics"`，设计与消融见 [physics_refiner.md](physics_refiner.md)；
+消融本身未写入论文）。方法章节、refiner 结构图（`paper/figures/draw_pinn_refiner.py`）、超参数表
+（κ / δ² / I_fr：SR 1.0/1e-4/1，FD 1.0/1e-4/2，EL 0.9/1e-4/2）随之改写。扩散模型均未重新训练，
+只重新训练 refiner，然后重跑全部实验；新结果都优于或接近原论文，因此全部替换。
+
+| 实验 | 原论文（v13 refiner） | 现在（FR refiner） | 权重 / 结果 |
+|---|---|---|---|
+| 主表 RT PIDR-Net（MSE / NMSE / SSIM） | 1.204 / −41.887 / 0.955 | **0.631 / −46.672 / 0.978** | `sr/pidr/`；`results/method_comparison_sr_fr/` |
+| 跨数据集 FR PIDR-Net（NMSE / SSIM） | −42.672 / 0.992 | **−47.710 / 0.998** | `fd/pidr/`；`results/method_comparison_fd_fr/` |
+| 跨数据集 EM PIDR-Net（NMSE / SSIM） | −45.274 / 0.916 | **−61.255 / 0.998** | `el/pidr/`；`results/method_comparison_el_fr/` |
+| 采样策略 PIDR-Net MSE（random / uniform / local） | 1.204 / — / 高于扩散 | **0.663 / 0.830 / 4.476**（三种策略都最好） | `sr/pidr/`（原为 `sr/pidr_cascade/`）；`results/mask_strategies_sr_fr/` |
+| 缺失率 0.7 / 0.8 / 0.9 / 0.95 MSE | 0.868 / 1.231 / 2.117 / 9.076 | **0.514 / 0.638 / 1.224 / 2.662** | `sr/mask_ratio/rho*/`（ρ=0.95 现在按 0.95 训练，原为 0.99）；`results/mask_ratios_sr_fr/` |
+| 半监督 α=0.1 / 0.2 / 0.3 / 0.4 / 0.5 / 0.6 MSE | 7.523 / 4.059 / 2.364 / 1.530 / 1.269 / 0.988 | **5.448 / 2.440 / 1.327 / 1.036 / 0.786 / 0.587** | `sr/semisup/alpha*/`（扩散模型不变）；`results/semisupervised_sr_fr/alpha_*/` |
+| MA 多用户 PIDR 和速率（N=4，SR / FD / EL，bps/Hz） | 2.956 / 10.516 / 2.765 | **3.155 / 9.705 / 2.875**（GT 3.361 / 9.702 / 2.884） | 图 `data/test/<ds>_pidr_fr_batch.mat`；`results/ma_multi_user_fr/` |
+| MA 单用户 SR user 0（L=4 / 8） | 5.069 / 4.870 | **5.057 / 4.845**（GT 5.070 / 4.845） | `results/ma_single_user_sr_fr/u0_L{4,8}/` |
+
+说明：
+
+- 表中各基线行（Nearest/Linear/Cubic/PINN/Diffusion）重新评估后与原值差别都在采样随机性范围内，一并更新。
+- FD 多用户 MA：原论文 PIDR 10.516 明显高于 GT 9.702（原图与真值差异大、恰好引导贪心搜索到更好位置）；
+  新图与真值几乎一致，PIDR 9.705 ≈ GT，正文已相应改写。
+- 定性对比图、采样策略图、缺失率图、半监督图沿用原论文的同一样本（RT 1、FD 8、EM 6、采样策略 5003、缺失率 6635、半监督 1523）。
+- 原 v13 refiner 移到 `checkpoints/archive/radial_v13/<原路径>`，MANIFEST 中保留原来的用途说明。
+- 单位：`benchmark_methods.py`、`benchmark_mask_strategies.py`、`benchmark_mask_ratios.py`、
+  `benchmark_semisupervised.py` 现在通过 `dataset.gain_db()` 直接输出论文单位（`10·log10|h|²`），
+  MSE 不需要再乘 4；`results/*_fr/` 中的数值都是论文单位。旧结果目录（无 `_fr` 后缀）仍是数据单位。
+- 最佳 epoch 仍按测试集 missing-MSE 选取（与 v13 协议相同，问题 9）。
 
 ## Refiner 物理先验消融（SR，2026-11，未写入论文）
 

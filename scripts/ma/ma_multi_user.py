@@ -331,7 +331,7 @@ def plot_multiuser_comparison(
     ax_bar.legend()
     ax_bar.grid(axis="y", linestyle="--", alpha=0.4)
 
-    fig.suptitle("Multi-User Movable Antenna Position Optimization", fontsize=14, fontweight="bold")
+
     fig.tight_layout()
     os.makedirs(os.path.dirname(save_path) or ".", exist_ok=True)
     fig.savefig(save_path, bbox_inches="tight", dpi=150)

@@ -186,7 +186,6 @@ def plot_mask_strategy_heatmap(
         for col_idx, (plot_data, title) in enumerate(plots):
             draw_panel(axes[row_idx, col_idx], plot_data, title, vmin, vmax)
 
-    fig.suptitle(f"Mask Strategy Comparison (Sample {sample_id})", fontsize=14)
     plt.tight_layout()
     plt.savefig(save_path, bbox_inches="tight")
     plt.close(fig)
@@ -200,6 +199,7 @@ def run_mask_strategy_benchmark(
     pidr_refiner_path: str,
     output_dir: str = Config.BENCHMARK.MASK_STRATEGIES.OUTPUT_DIR,
     num_eval_samples: int = Config.BENCHMARK.MASK_STRATEGIES.NUM_EVAL_SAMPLES,
+    only_sample_ids=None,
 ) -> None:
     device = Config.DEVICE
     os.makedirs(output_dir, exist_ok=True)
@@ -235,11 +235,15 @@ def run_mask_strategy_benchmark(
     if num_eval == 0:
         raise ValueError("num_eval_samples must be > 0.")
 
-    for dataset_idx in tqdm(range(num_eval), desc=f"Mask strategy benchmark ({num_eval} samples)"):
+    eval_positions = list(range(num_eval))
+    if only_sample_ids:
+        pos = {int(v): i for i, v in enumerate(dataset.indices)}
+        eval_positions = [pos[int(v)] for v in only_sample_ids]
+    for dataset_idx in tqdm(eval_positions, desc=f"Mask strategy benchmark ({len(eval_positions)} samples)"):
         sample_idx = int(dataset.indices[dataset_idx])
         gt_norm = dataset.gt_data[sample_idx].copy()
         valid_mask = dataset.valid_masks[sample_idx, 0].copy()
-        gt_phys = dataset.inverse_normalize_channel(gt_norm[0], 0)
+        gt_phys = dataset.gain_db(gt_norm[0])
         row_payloads = []
 
         for strategy_offset, (strategy_key, strategy_label) in enumerate(MASK_STRATEGIES):
@@ -278,7 +282,7 @@ def run_mask_strategy_benchmark(
                 if enforce_observed:
                     pidr_out = pidr_out * (1 - mask_tensor) + sparse_tensor * mask_tensor
 
-            sparse_phys = dataset.inverse_normalize_channel(sparse_norm[0], 0)
+            sparse_phys = dataset.gain_db(sparse_norm[0])
             sparse_display = sparse_phys.copy()
             sparse_display[mask_np < 0.5] = np.nan
 
@@ -286,9 +290,9 @@ def run_mask_strategy_benchmark(
             for display_name, method in INTERP_METHODS:
                 interp_maps[display_name] = classical_interp(sparse_phys, mask_np, method=method)
 
-            pinn_phys = dataset.inverse_normalize_channel(pinn_out[0, 0].cpu().numpy(), 0)
-            diffusion_phys = dataset.inverse_normalize_channel(diffusion_out[0, 0].cpu().numpy(), 0)
-            pidr_phys = dataset.inverse_normalize_channel(pidr_out[0, 0].cpu().numpy(), 0)
+            pinn_phys = dataset.gain_db(pinn_out[0, 0].cpu().numpy())
+            diffusion_phys = dataset.gain_db(diffusion_out[0, 0].cpu().numpy())
+            pidr_phys = dataset.gain_db(pidr_out[0, 0].cpu().numpy())
 
             method_maps = [
                 ("Nearest", interp_maps["Nearest"]),
@@ -353,21 +357,26 @@ def run_mask_strategy_benchmark(
 
 
 if __name__ == "__main__":
+    import argparse
+
+    cfg = Config.BENCHMARK.MASK_STRATEGIES
+    parser = argparse.ArgumentParser(description="Mask strategy benchmark (defaults: Config.BENCHMARK.MASK_STRATEGIES)")
+    parser.add_argument("--diffusion-ckpt", default=None)
+    parser.add_argument("--pinn-ckpt", default=None)
+    parser.add_argument("--pidr-diffusion-ckpt", default=None)
+    parser.add_argument("--pidr-refiner-ckpt", default=None)
+    parser.add_argument("--output-dir", default=cfg.OUTPUT_DIR)
+    parser.add_argument("--num-eval-samples", type=int, default=cfg.NUM_EVAL_SAMPLES)
+    parser.add_argument("--only-sample-ids", type=int, nargs="+", default=None,
+                        help="evaluate (and plot) only these dataset sample ids (the number in sample_<id>.pdf)")
+    args = parser.parse_args()
     run_mask_strategy_benchmark(
-        diffusion_path=resolve_checkpoint(
-            Config.BENCHMARK.MASK_STRATEGIES.DIFFUSION_CHECKPOINT_CANDIDATES,
-            "Diffusion",
-        ),
-        pinn_path=resolve_checkpoint(
-            Config.BENCHMARK.MASK_STRATEGIES.PINN_CHECKPOINT_CANDIDATES,
-            "PINN",
-        ),
-        pidr_diffusion_path=resolve_checkpoint(
-            Config.BENCHMARK.MASK_STRATEGIES.PIDR_DIFFUSION_CHECKPOINT_CANDIDATES,
-            "PIDR-Diffusion",
-        ),
-        pidr_refiner_path=resolve_checkpoint(
-            Config.BENCHMARK.MASK_STRATEGIES.PIDR_REFINER_CHECKPOINT_CANDIDATES,
-            "PIDR-Refiner",
-        ),
+        diffusion_path=args.diffusion_ckpt or resolve_checkpoint(cfg.DIFFUSION_CHECKPOINT_CANDIDATES, "Diffusion"),
+        pinn_path=args.pinn_ckpt or resolve_checkpoint(cfg.PINN_CHECKPOINT_CANDIDATES, "PINN"),
+        pidr_diffusion_path=args.pidr_diffusion_ckpt
+        or resolve_checkpoint(cfg.PIDR_DIFFUSION_CHECKPOINT_CANDIDATES, "PIDR-Diffusion"),
+        pidr_refiner_path=args.pidr_refiner_ckpt or resolve_checkpoint(cfg.PIDR_REFINER_CHECKPOINT_CANDIDATES, "PIDR-Refiner"),
+        output_dir=args.output_dir,
+        num_eval_samples=args.num_eval_samples,
+        only_sample_ids=args.only_sample_ids,
     )

@@ -79,15 +79,15 @@ Beamforming, user scheduling, antenna position selection, and movement planning 
 
 Existing MA channel estimation and mapping studies use compressed sensing \cite{ref_cs,ref_cs_framework}, Bayesian sparse reconstruction \cite{ref_sbar}, learning methods \cite{ref_agmae}, and tensor decomposition for MIMO MA systems \cite{ref_tensor}. Much of this work estimates a real valued gain map, whereas communication design may also require the real and imaginary components that contain the phase information. In addition, deterministic regressors trained from sparse inputs can lose accuracy when measurements are scarce, irregularly distributed, or confined to one part of the grid, where values outside the measured region must be extrapolated.
 
-Sparse MA channel map estimation must fill large unmeasured regions while preserving the relations among the three CSI channels. Denoising diffusion models can learn the distribution of complete maps and generate missing values conditioned on partial observations \cite{ref_ddpm}. After this initial estimate, propagation features and algebraic channel relations can be used to correct local errors. Physics informed neural networks (PINNs) provide a way to include such information in a learned reconstruction model \cite{ref_pinn}. We therefore use diffusion for the initial map estimate and a PINN for the subsequent correction.
+Sparse MA channel map estimation must fill large unmeasured regions while preserving the relations among the three CSI channels. Denoising diffusion models can learn the distribution of complete maps and generate missing values conditioned on partial observations \cite{ref_ddpm}. After this initial estimate, the propagation model of MA channels and the algebraic channel relations can be used to correct local errors. Physics informed neural networks (PINNs) provide a way to include such information in a learned reconstruction model \cite{ref_pinn}. We therefore use diffusion for the initial map estimate and a PINN for the subsequent correction.
 
-This paper studies sparse complex CSI map reconstruction over a 2D MA movement region and proposes PIDR-Net for this task. Its conditional diffusion stage estimates the complete map from sparse CSI observations. During reverse sampling, measured entries are restored after each step, and the amplitude channel is periodically recomputed from the real and imaginary channels. A compact PINN then refines the estimate using the diffusion output, observation mask, coordinate tensor, and a learned propagation prior. The two stages are trained separately and perform initial reconstruction followed by local correction.
+This paper studies sparse complex CSI map reconstruction over a 2D MA movement region and proposes PIDR-Net for this task. Its conditional diffusion stage estimates the complete map from sparse CSI observations. During reverse sampling, measured entries are restored after each step, and the amplitude channel is periodically recomputed from the real and imaginary channels. A compact PINN then refines the estimate using the diffusion output, observation mask, coordinate tensor, and a field response physics prior, which re-estimates the map from the measurements by LMMSE estimation with a plane wave covariance derived from the diffusion output. The two stages are trained separately and perform initial reconstruction followed by local correction.
 
 The main contributions of this paper are summarized as follows.
 \begin{itemize}
     \item We formulate sparse complex CSI reconstruction for an MA system as a map completion problem with three channels on a 2D movement region, with observation masking, validity screening, and separate normalization of the amplitude, real, and imaginary components.
     \item We propose a conditional diffusion stage that reconstructs complete CSI maps by reverse sampling with exact restoration of measured values and periodic correction of the amplitude channel.
-    \item We design a lightweight physics informed refinement stage that incorporates coordinate features and a learnable propagation prior into a reconstruction network with an encoder and decoder.
+    \item We design a lightweight physics informed refinement stage built on a field response physics prior: the plane wave model of MA channels gives a covariance for LMMSE estimation from the measurements, and a reconstruction network with an encoder and decoder corrects this physics estimate.
     \item We develop separate training  and inference procedures for the two stages, reuse diffusion estimates during refiner training, and evaluate PIDR-Net on RT and two additional datasets, multiple sampling strategies and measurement budgets, and MA position optimization.
 \end{itemize}
 
@@ -237,7 +237,7 @@ Both the conditional diffusion network and the refinement network take normalize
 
 \subsection{Architecture Overview}
 
-PIDR-Net combines a conditional diffusion model with a physics informed neural network (PINN) refiner. The diffusion stage estimates the unobserved channel coefficients by repeatedly denoising a random initial tensor conditioned on the sparse channel measurements and their mask. The PINN then refines the coarse estimate to reduce errors at individual grid points and disagreement among the three channels.
+PIDR-Net combines a conditional diffusion model with a physics informed neural network (PINN) refiner. The diffusion stage estimates the unobserved channel coefficients by repeatedly denoising a random initial tensor conditioned on the sparse channel measurements and their mask. The PINN then refines the coarse estimate with the help of a field response physics estimate to reduce errors at individual grid points and disagreement among the three channels.
 
 The conditional diffusion stage learns the distribution of complete normalized channel maps conditioned on the normalized input $\widetilde{\mat{X}}^{I}$ and its mask $\mat{M}^{I}$. As illustrated in Fig.~\ref{fig:conditional_diffusion_stage}, it starts from Gaussian noise and applies conditional reverse diffusion to obtain the coarse normalized estimate
 \begin{equation}
@@ -453,20 +453,52 @@ This objective follows standard denoising diffusion probabilistic learning and t
 
 \subsubsection{Refinement Network interpretation}
 
-Fig.~\ref{fig:pinn_refiner_arch} details the refinement stage. The upper branch uses a trainable propagation center, path loss exponent, and wave number to compute one amplitude map and two phase maps. The lower branch concatenates these maps with the diffusion estimate, input mask, and coordinate tensor, and processes the resulting tensor with a compact encoder and decoder. Thus, \emph{physics informed refinement} here refers to the explicit use of coordinate and propagation features in the learned correction; it does not impose an exact propagation equation on the output.
+Fig.~\ref{fig:pinn_refiner_arch} details the refinement stage. The upper branch is a field response physics prior. It uses the plane wave structure of the MA channel to estimate the complex channel map from the measured entries alone, with a spatial covariance obtained from the diffusion estimate, and it also returns the posterior variance of this estimate. The lower branch concatenates the physics estimate and its variance with the diffusion estimate, input mask, and coordinate tensor, and a compact encoder and decoder predicts a residual correction that is added to the physics estimate. Thus, \emph{physics informed refinement} here means that an explicit propagation model, the field response model, produces a physically consistent estimate that the network then corrects; no penalty term is imposed on the output.
 
 \begin{figure*}[t]
     \centering
     \captionsetup{font=footnotesize}
-    \includegraphics[width=0.92\textwidth]{figures/pinn_refiner_architecture.pdf}
+    \includegraphics[width=0.96\textwidth]{figures/pinn_refiner_architecture.pdf}
     \caption{\protect\centering Architecture of the PINN refiner in PIDR-Net.}
     \label{fig:pinn_refiner_arch}
 \end{figure*}
 
 
-\subsubsection{Learnable propagation prior}
+\subsubsection{Field response physics prior}
 
-The propagation branch forms approximate radial attenuation and phase patterns from a few trainable scalars in $\phi$ shared across samples. These internal features do not represent the actual geometry between the transmitter and receiver or determine the reconstructed channel by themselves.
+Within the small transmit region, the channel between an MA and the receiver is the superposition of the plane waves of the propagation paths, i.e., the field response model of MA channels \cite{ref_ma_modeling,ref_cs,ref_cs_framework}:
+\begin{equation}
+	h(\vect{t})=\sum_{l=1}^{L_{\mathrm p}} g_l\, e^{\,j\vect{k}_l^{T}\vect{t}},
+	\qquad \norm{\vect{k}_l}_2\le k_0=\frac{2\pi}{\lambda},
+	\label{eq:field_response}
+\end{equation}
+where $L_{\mathrm p}$ is the number of paths, $g_l$ is the complex gain of path $l$, and $\vect{k}_l\in\R^{2}$ is the projection of its wave vector onto the transmit plane. The spatial spectrum of every map is therefore confined to the disk $\norm{\vect{k}}_2\le k_0$. If the path gains are uncorrelated with powers $p_l=\mathbb{E}|g_l|^2$, the spatial covariance depends only on the displacement $\vect{d}$,
+\begin{equation}
+	\mathbb{E}\big[h(\vect{t}+\vect{d})\,h^{*}(\vect{t})\big]=\sum_{l=1}^{L_{\mathrm p}} p_l\, e^{\,j\vect{k}_l^{T}\vect{d}},
+	\label{eq:fr_covariance}
+\end{equation}
+which is the Fourier transform of the path power wavenumber spectrum and is positive semidefinite for any nonnegative spectrum. The physics prior estimates this spectrum separately for each map and uses the resulting covariance for linear minimum mean squared error (LMMSE) estimation from the measured entries.
+
+Let $\hat{h}^{\mathrm{diff}}(u,v)=\widehat{X}^{\mathrm{re}}(u,v)+j\widehat{X}^{\mathrm{im}}(u,v)$ denote the complex channel of the diffusion estimate on the original scale, obtained from \eqref{eq:inverse_normalization}. Its normalized periodogram on a zero padded $2N\times 2N$ frequency grid is mixed with the average normalized periodogram $\bar{\Psi}$ of the training maps:
+\begin{equation}
+	\Psi=\kappa\,\frac{|\mathcal{F}_{2N}\{\hat{h}^{\mathrm{diff}}\}|^{2}}{\norm{\mathcal{F}_{2N}\{\hat{h}^{\mathrm{diff}}\}}_{F}^{2}}+(1-\kappa)\bar{\Psi},
+	\label{eq:fr_spectrum}
+\end{equation}
+where $\mathcal{F}_{2N}$ is the 2D discrete Fourier transform with zero padding and $\kappa\in[0,1]$ is a mixing weight. The covariance between grid points $(u,v)$ and $(u',v')$ is then read from the inverse transform at their index displacement,
+\begin{equation}
+	\Gamma_{(u,v),(u',v')}=\mathcal{F}^{-1}_{2N}\{\Psi\}(u-u',v-v'),
+	\label{eq:fr_kernel}
+\end{equation}
+where the padding ensures that every displacement within the grid is represented without wrap around. Let $\vect{y}\in\mathbb{C}^{|\mathcal{A}_{\mathrm{in}}|}$ collect the measured complex channels on the input set $\mathcal{A}_{\mathrm{in}}$. The physics estimate and its posterior variance at every grid point $q\in\Omega$ are
+\begin{align}
+	\hat{h}^{\mathrm{fr}}(q)&=\mat{\Gamma}_{q,\mathcal{A}_{\mathrm{in}}}\big(\mat{\Gamma}_{\mathcal{A}_{\mathrm{in}}\mathcal{A}_{\mathrm{in}}}+\delta^{2}\mat{I}\big)^{-1}\vect{y},
+	\label{eq:fr_lmmse}\\
+	v(q)&=\Gamma_{q,q}-\mat{\Gamma}_{q,\mathcal{A}_{\mathrm{in}}}\big(\mat{\Gamma}_{\mathcal{A}_{\mathrm{in}}\mathcal{A}_{\mathrm{in}}}+\delta^{2}\mat{I}\big)^{-1}\mat{\Gamma}_{\mathcal{A}_{\mathrm{in}},q},
+	\label{eq:fr_variance}
+\end{align}
+where $\delta^{2}$ is a small regularization (nugget) term. The estimate in \eqref{eq:fr_lmmse} depends on the measurements only; the diffusion output enters only through the covariance. The estimation can be repeated $I_{\mathrm{fr}}$ times, with $\hat{h}^{\mathrm{fr}}$ replacing $\hat{h}^{\mathrm{diff}}$ in \eqref{eq:fr_spectrum}.
+
+The amplitude, real, and imaginary maps of $\hat{h}^{\mathrm{fr}}$ are computed as in \eqref{eq:continuous_gain_t} and normalized with the same extrema as the data, giving the physics estimate $\widehat{\mat{X}}^{\mathrm{fr}}\in\R^{3\times N\times N}$. The posterior variance is mapped to a confidence channel $\mat{V}(u,v)=\operatorname{clip}_{[-1,1]}\big(\log_{10}v(u,v)/3+1\big)$, which indicates where the physics estimate is reliable. The physics prior has no trainable parameters. Its hyperparameters $\kappa$, $\delta^{2}$, and $I_{\mathrm{fr}}$ are selected on the training split by a grid search over the gain NMSE of $\widehat{\mat{X}}^{\mathrm{fr}}$, and $\bar{\Psi}$ is computed from the training maps.
 
 Let the normalized coordinate tensor on the discrete spatial grid be denoted by
 \begin{equation}
@@ -474,78 +506,24 @@ Let the normalized coordinate tensor on the discrete spatial grid be denoted by
 	\qquad (u,v)\in\Omega,
 	\label{eq:coordinate_tensor}
 \end{equation}
-where $\Omega=\{1,\ldots,N\}\times\{1,\ldots,N\}$ is the set of all grid indices, and $x(u,v),y(u,v)\in[0,1]$ are the normalized horizontal and vertical coordinates of grid location $(u,v)$, respectively. Equivalently, the full coordinate tensor satisfies $\mat{C}\in\mathbb{R}^{2\times N\times N}$, where the first channel stores the $x$-coordinates and the second channel stores the $y$-coordinates. The same coordinate tensor is used for all samples with the same spatial resolution.
-In this work, the coordinate normalization is
-\begin{equation}
-	x(u,v)=\frac{v-1}{N-1},
-	\qquad
-	y(u,v)=\frac{u-1}{N-1},
-	\label{eq:coordinate_normalization}
-\end{equation}
-Thus, $\mat{C}$ depends only on grid resolution and tells the refiner each feature's location, which the diffusion estimate and input mask do not encode explicitly.
-
-The prior branch first introduces a learnable propagation center in the normalized coordinate system,
-\begin{equation}
-	x_{\mathrm{pc}}=\sigma(\xi_x),
-	\qquad
-	y_{\mathrm{pc}}=\sigma(\xi_y),
-	\label{eq:propagation_center}
-\end{equation}
-where $\xi_x$ and $\xi_y$ are unconstrained learnable raw parameters and $\sigma(\cdot)$ is the sigmoid function. The sigmoid mapping confines $x_{\mathrm{pc}}$ and $y_{\mathrm{pc}}$ to the interval $[0,1]$, so that the learned propagation center remains inside the normalized reconstruction region. This center is a trainable spatial reference point used to construct radial prior features, rather than a known physical transmitter or receiver coordinate.
-
-Given this learned center, the branch computes the Euclidean distance from the propagation center to each candidate MA grid point,
-\begin{equation}
-	d(u,v)=\sqrt{\big(x(u,v)-x_{\mathrm{pc}}\big)^2+\big(y(u,v)-y_{\mathrm{pc}}\big)^2},
-	\label{eq:distance_map}
-\end{equation}
-where $d(u,v)$ is the distance map. This distance is not assumed to be the true separation between the transmitter and receiver; instead, it is the geometric variable used to construct the radial priors for amplitude and phase.
-
-The other two physical quantities are a learnable path loss exponent and a learnable wave number, defined as
-\begin{equation}
-	n=\softplus(\xi_n)+1,
-	\qquad
-	k=\softplus(\xi_k)+10^{-3},
-	\label{eq:nk_parameters}
-\end{equation}
-where $\xi_n$ and $\xi_k$ are unconstrained learnable raw parameters. The $\softplus(\cdot)$ mapping guarantees positivity, while the constants $1$ and $10^{-3}$ further prevent degenerate values during training. Here, $n$ controls how the prior attenuation changes with distance, whereas $k$ controls the spatial oscillation frequency of the phase prior.
-
-Based on $d(u,v)$, $n$, and $k$, the prior feature maps are constructed as
-\begin{align}
-	\mat{A}_{\mathrm{pr}}(u,v)
-	&=a_s\big[-10n\log_{10}(d(u,v)+10^{-3})\big]+a_b,
-	\label{eq:amp_prior}\\
-	\mat{R}_{\mathrm{pr}}(u,v)
-	&=\cos\big(kd(u,v)+\varphi_b\big),
-	\label{eq:re_prior}\\
-	\mat{I}_{\mathrm{pr}}(u,v)
-	&=\sin\big(kd(u,v)+\varphi_b\big),
-	\label{eq:im_prior}
-\end{align}
-where $\mat{A}_{\mathrm{pr}}(u,v)$ is the amplitude prior, $\mat{R}_{\mathrm{pr}}(u,v)$ is the phase real prior, and $\mat{I}_{\mathrm{pr}}(u,v)$ is the phase imaginary prior. In addition, $a_s$ and $a_b$ are learnable scale and bias terms for the amplitude branch, and $\varphi_b$ is a learnable phase offset. Equation~\eqref{eq:amp_prior} describes an approximate logarithmic attenuation trend. Equations~\eqref{eq:re_prior} and \eqref{eq:im_prior} describe the real and imaginary parts of a radial sinusoidal pattern.
-
-Finally, the three prior maps are concatenated along the channel dimension to form the propagation prior tensor,
-\begin{equation}
-	\mat{P}_{\mathrm{pr}}=\big[\mat{A}_{\mathrm{pr}},\mat{R}_{\mathrm{pr}},\mat{I}_{\mathrm{pr}}\big]\in\mathbb{R}^{3\times N\times N}.
-	\label{eq:prior_tensor}
-\end{equation}
-The refiner combines $\mat{P}_{\mathrm{pr}}$ with the diffusion estimate, mask, and $\mat{C}$. Coordinates identify grid positions; the prior offers learned radial attenuation and phase patterns for correcting unobserved entries, without imposing an exact propagation law.
+where $x(u,v),y(u,v)\in[0,1]$ are the normalized horizontal and vertical coordinates of grid location $(u,v)$, i.e., $x(u,v)=(v-1)/(N-1)$ and $y(u,v)=(u-1)/(N-1)$. The coordinate tensor $\mat{C}\in\mathbb{R}^{2\times N\times N}$ depends only on the grid resolution and tells the refiner each feature's location, which the other inputs do not encode explicitly.
 
 \subsubsection{Input features and network structure}
 
-Within the PINN refiner, the coarse diffusion reconstruction and input mask are concatenated with the internally constructed propagation prior and coordinate tensor:
+Within the PINN refiner, the coarse diffusion reconstruction and input mask are concatenated with the physics estimate, its confidence channel, and the coordinate tensor:
 \begin{equation}
-    \mat{Z}_{\mathrm{in}}=\Concat\big(\widehat{\mat{X}}^{\mathrm{diff}},\mat{M}^{I},\mat{P}_{\mathrm{pr}},\mat{C}\big).
+    \mat{Z}_{\mathrm{in}}=\Concat\big(\widehat{\mat{X}}^{\mathrm{diff}},\mat{M}^{I},\widehat{\mat{X}}^{\mathrm{fr}},\mat{V},\mat{C}\big).
     \label{eq:pinn_input_tensor}
 \end{equation}
-Hence, the effective input dimensionality is nine channels. The refinement backbone can be written compactly as
+Hence, the effective input dimensionality is ten channels. The refinement backbone predicts a correction of the physics estimate,
 \begin{equation}
     \widehat{\mat{X}}^{\mathrm{pinn}}
-    =\tanh\!\left(\mathcal{B}_{\phi}(\mat{Z}_{\mathrm{in}})\right),
+    =\operatorname{clip}_{[-1,1]}\!\left(\widehat{\mat{X}}^{\mathrm{fr}}+\mathcal{B}_{\phi}(\mat{Z}_{\mathrm{in}})\right),
     \label{eq:pinn_backbone_map}
 \end{equation}
-where $\mathcal{B}_{\phi}$ denotes the encoder and decoder before the final bounded activation. The output is the normalized refined map. The network uses two convolutional blocks at the input resolution, one stride 2 downsampling layer, a bottleneck block, bilinear upsampling, skip fusion, and a final $\tanh$ output layer.
+where $\mathcal{B}_{\phi}$ denotes the encoder and decoder. The output is the normalized refined map. The network uses two convolutional blocks at the input resolution, one stride 2 downsampling layer, a bottleneck block, bilinear upsampling, skip fusion, and a final linear projection.
 
-The refinement network contains the propagation branch in \eqref{eq:prior_tensor} and a convolutional reconstruction network. The propagation branch produces the three auxiliary maps defined above. The basic convolutional unit is
+The refinement network thus consists of the physics prior in \eqref{eq:fr_lmmse} and a convolutional reconstruction network. The basic convolutional unit is
 \begin{equation}
     \CBR_{\ell}(\mat{F})
     =
@@ -581,16 +559,16 @@ The decoder first upsamples the bottleneck features back to the encoder resoluti
     \label{eq:pinn_decoder}
 \end{align}
 Here, $\Interp(\cdot)$ denotes bilinear interpolation that resizes the bottleneck feature map to the spatial resolution of the encoder feature $\mat{E}$ before skip fusion.
-Finally, a $1\times1$ projection maps the decoded feature back to the three CSI channels, and the bounded activation keeps the prediction in the normalized range:
+Finally, a $1\times1$ projection maps the decoded feature to a correction of the three CSI channels, which is added to the physics estimate:
 \begin{equation}
     \widehat{\mat{X}}^{\mathrm{pinn}}
     =
-    \tanh\!\left(\Conv_{1\times1}(\mat{D})\right).
+    \operatorname{clip}_{[-1,1]}\!\left(\widehat{\mat{X}}^{\mathrm{fr}}+\Conv_{1\times1}(\mat{D})\right).
     \label{eq:pinn_output}
 \end{equation}
-Equations~\eqref{eq:pinn_input_tensor}--\eqref{eq:pinn_output} show explicitly how the diffusion reconstruction, input mask, learnable propagation prior, and coordinate tensor are fused before spatial refinement. The detailed channel width used in the experiments is reported in Table~\ref{tab:exp_hparams}.
+The $1\times1$ projection is initialized to zero, so training starts from the physics estimate. Equations~\eqref{eq:pinn_input_tensor}--\eqref{eq:pinn_output} show explicitly how the diffusion reconstruction, input mask, physics estimate, confidence channel, and coordinate tensor are fused before spatial refinement. The detailed channel width used in the experiments is reported in Table~\ref{tab:exp_hparams}.
 
-The refinement network is smaller than the diffusion network because it operates on an already completed map. Its convolutional layers correct local errors and spatial transitions, while the prior and coordinate channels provide the corresponding grid information. The diffusion and refinement stages therefore perform map completion and correction, respectively.
+The refinement network is smaller than the diffusion network because it operates on already completed maps. The physics prior gives an estimate that is consistent with the plane wave model and anchored only to the measurements, while the diffusion estimate carries the structure learned from the training maps; the convolutional layers combine the two and correct the remaining local errors, guided by the confidence and coordinate channels. The diffusion and refinement stages therefore perform map completion and correction, respectively.
 
 \subsubsection{Refinement objective}
 
@@ -601,7 +579,7 @@ The refinement stage is trained in normalized space with a missing region recons
     {\sum_{(u,v)\in\Omega}(1-M^{I}(u,v))}.
     \label{eq:data_loss}
 \end{equation}
-For fully measured training maps, $\mat{M}^{L}$ covers the full grid, so this term evaluates the refiner at positions withheld from the model input. After refinement, the input entries are reinserted according to \eqref{eq:final_estimator}, so the final PIDR-Net output preserves the supplied CSI values exactly. The diffusion and refinement stages use the separate objectives in \eqref{eq:diffusion_loss} and \eqref{eq:data_loss}; physical information enters through the sampling projection, propagation prior, coordinates, and restoration of measured values.
+For fully measured training maps, $\mat{M}^{L}$ covers the full grid, so this term evaluates the refiner at positions withheld from the model input. After refinement, the input entries are reinserted according to \eqref{eq:final_estimator}, so the final PIDR-Net output preserves the supplied CSI values exactly. The diffusion and refinement stages use the separate objectives in \eqref{eq:diffusion_loss} and \eqref{eq:data_loss}; physical information enters through the sampling projection, the field response physics prior, and restoration of measured values.
 
 \subsection{Training and Inference Algorithms}
 
@@ -622,7 +600,8 @@ The complete workflow is summarized by Algorithms~\ref{alg:offline_training} and
 \STATE Generate coarse reconstructions with physics guidance by iterating \eqref{eq:noise_prediction}, \eqref{eq:guided_noise_update}, and \eqref{eq:reverse_update}.
 \STATE Store the diffusion reconstructions to avoid repeated sampling during refiner training.
 \FOR{each PINN epoch}
-    \STATE Refine the cached diffusion output using the mask, propagation prior, and coordinate features.
+    \STATE Compute the field response physics estimate and variance by \eqref{eq:fr_spectrum}--\eqref{eq:fr_variance} for each cached diffusion output, with $\kappa$, $\delta^{2}$, and $I_{\mathrm{fr}}$ selected on the training maps.
+    \STATE Refine the cached diffusion output using the mask, physics estimate, confidence, and coordinate features.
     \STATE Update $\phi$ using the $\ell_1$ loss over the missing region in \eqref{eq:data_loss}.
 \ENDFOR
 \end{algorithmic}
@@ -706,7 +685,7 @@ Besides the dataset generated by RT, we also conduct experiments on a field resp
 Three reconstruction strategies based on learning are compared.
 \begin{itemize}
     \item \textit{Diffusion}: the conditional diffusion model alone, using physics informed reverse sampling and exact restoration of measured values;
-    \item \textit{PINN}: the physics informed reconstruction network operating directly on the sparse input map and mask;
+    \item \textit{PINN}: a standalone physics informed reconstruction network operating directly on the sparse input map and mask, with the same encoder and decoder, coordinate inputs, and learnable radial propagation features (a trainable propagation center, path loss exponent, and wave number);
     \item \textit{PIDR-Net}: the proposed method, in which the diffusion model first produces a coarse completion and the physics informed refinement network subsequently improves local accuracy and consistency among channels.
 \end{itemize}
 For the sampling strategy study, three classical interpolation baselines, namely nearest neighbor, linear, and cubic interpolation, are additionally included to quantify the benefit of learned priors under irregular observation geometries.
@@ -743,6 +722,8 @@ Time embedding dimension & $256$ \\
 Diffusion dropout & $0.10$ \\ 
 Attention heads & $4$ \\ 
 PINN base channels & $32$ \\ 
+Physics prior $\kappa$ (RT/FR/EM) & $1.0/1.0/0.9$ \\ 
+Physics prior $\delta^{2}$, $I_{\mathrm{fr}}$ (RT/FR/EM) & $10^{-4}$, $1/2/2$ \\ 
 Evaluation mask seed & $0$ \\ 
 Representative evaluation samples & up to $50$ \\ 
 \bottomrule
@@ -787,9 +768,9 @@ Table~\ref{tab:rt_main_results} reports the results on the Sionna RT dataset. PI
 \toprule
 Method & MSE & NMSE (dB) & PSNR (dB) & SSIM \\
 \midrule
-Diffusion & 1.515 & -39.959 & 29.011 & 0.931 \\
+Diffusion & 1.610 & -39.871 & 28.923 & 0.929 \\
 PINN & 2.455 & -37.143 & 26.195 & 0.880 \\
-PIDR-Net & $\boldsymbol{1.204}$ & $\boldsymbol{-41.887}$ & $\boldsymbol{30.938}$ & $\boldsymbol{0.955}$ \\
+PIDR-Net & $\boldsymbol{0.631}$ & $\boldsymbol{-46.672}$ & $\boldsymbol{35.723}$ & $\boldsymbol{0.978}$ \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -800,7 +781,7 @@ The qualitative examples show the same pattern. The maps produced by standalone 
 
 \subsection{Cross Dataset Comparison}
 
-The three learned methods are also trained and evaluated separately on the RT, field response, and EM simulation datasets. Table~\ref{tab:cross_dataset_results} summarizes the results. PIDR-Net provides the best NMSE, PSNR, and SSIM on each dataset.
+The three learned methods are also trained and evaluated separately on the RT, field response, and EM simulation datasets. Table~\ref{tab:cross_dataset_results} summarizes the results. PIDR-Net provides the best NMSE, PSNR, and SSIM on each dataset. The gain of the refinement stage over diffusion is largest on the EM simulation dataset, where the NMSE decreases from $-39.702$~dB to $-61.255$~dB. This dataset is generated by electromagnetic propagation simulation, so its maps follow the plane wave structure assumed by the field response physics prior particularly closely, which is consistent with the role of the prior in the refiner.
 
 \begin{table}[t]
 \caption{Cross dataset comparison under the same sparse observation setting.}
@@ -812,17 +793,17 @@ The three learned methods are also trained and evaluated separately on the RT, f
 \toprule
 Dataset & Method & NMSE (dB) & PSNR (dB) & SSIM \\
 \midrule
-RT & Diffusion & -39.959 & 29.011 & 0.931 \\
+RT & Diffusion & -39.871 & 28.923 & 0.929 \\
 RT & PINN & -37.143 & 26.195 & 0.880 \\
-RT & PIDR-Net & $\boldsymbol{-41.887}$ & $\boldsymbol{30.938}$ & $\boldsymbol{0.955}$ \\
+RT & PIDR-Net & $\boldsymbol{-46.672}$ & $\boldsymbol{35.723}$ & $\boldsymbol{0.978}$ \\
 \midrule
-Field response & Diffusion & -41.532 & 33.390 & 0.987 \\
+Field response & Diffusion & -41.482 & 33.340 & 0.987 \\
 Field response & PINN & -37.477 & 29.335 & 0.970 \\
-Field response & PIDR-Net & $\boldsymbol{-42.672}$ & $\boldsymbol{34.530}$ & $\boldsymbol{0.992}$ \\
+Field response & PIDR-Net & $\boldsymbol{-47.710}$ & $\boldsymbol{39.568}$ & $\boldsymbol{0.998}$ \\
 \midrule
-EM simulation & Diffusion & -39.752 & 30.863 & 0.708 \\
+EM simulation & Diffusion & -39.702 & 30.813 & 0.711 \\
 EM simulation & PINN & -41.569 & 32.680 & 0.865 \\
-EM simulation & PIDR-Net & $\boldsymbol{-45.274}$ & $\boldsymbol{36.385}$ & $\boldsymbol{0.916}$ \\
+EM simulation & PIDR-Net & $\boldsymbol{-61.255}$ & $\boldsymbol{52.366}$ & $\boldsymbol{0.998}$ \\
 
 \bottomrule
 \end{tabular}%
@@ -887,45 +868,43 @@ The averaged quantitative results under the three masking strategies are reporte
 			Mask strategy & Method  & MSE & NMSE (dB) & PSNR (dB) & SSIM \\
 			\midrule
 			\multirow{6}{*}{Random} 
-			& Nearest  & 17.639 & -28.273 & 17.324 & 0.358 \\
-			& Linear  & 26.056 & -26.693 & 15.744 & 0.398 \\
-			& Cubic  & 31.018 & -25.891 & 14.943 & 0.359 \\
-			& PINN  & 2.596 & -37.059 & 26.110 & 0.875 \\
-			& Diffusion  & 1.588 & -39.821 & 28.872 & 0.929 \\
-			& PIDR-Net  & $\boldsymbol{1.204}$ & $\boldsymbol{-41.643}$ & $\boldsymbol{30.694}$ & $\boldsymbol{0.954}$ \\
+			& Nearest  & 17.640 & -28.273 & 17.324 & 0.359 \\
+			& Linear  & 26.057 & -26.694 & 15.745 & 0.399 \\
+			& Cubic  & 31.019 & -25.892 & 14.943 & 0.359 \\
+			& PINN  & 2.455 & -37.143 & 26.195 & 0.880 \\
+			& Diffusion  & 1.559 & -39.820 & 28.871 & 0.929 \\
+			& PIDR-Net  & $\boldsymbol{0.663}$ & $\boldsymbol{-46.588}$ & $\boldsymbol{35.640}$ & $\boldsymbol{0.978}$ \\
 			\midrule
 			\multirow{6}{*}{Uniform} 
-			& Nearest  & 19.363 & -27.896 & 16.947 & 0.291 \\
-			& Linear  & 13.797 & -29.348 & 18.399 & 0.409 \\
-			& Cubic  & 15.544 & -28.862 & 17.913 & 0.373 \\
-			& PINN  & 3.654 & -35.227 & 24.278 & 0.811 \\
-			& Diffusion  & 1.695 & -39.404 & 28.455 & 0.919 \\
-			& PIDR-Net  & $\boldsymbol{1.408}$ & $\boldsymbol{-41.066}$ & $\boldsymbol{30.117}$ & $\boldsymbol{0.943}$ \\
-			
+			& Nearest  & 19.364 & -27.896 & 16.947 & 0.292 \\
+			& Linear  & 13.797 & -29.348 & 18.400 & 0.410 \\
+			& Cubic  & 15.545 & -28.863 & 17.914 & 0.374 \\
+			& PINN  & 3.608 & -35.217 & 24.268 & 0.807 \\
+			& Diffusion  & 1.715 & -39.433 & 28.484 & 0.920 \\
+			& PIDR-Net  & $\boldsymbol{0.830}$ & $\boldsymbol{-45.082}$ & $\boldsymbol{34.134}$ & $\boldsymbol{0.968}$ \\
 			\midrule
 			\multirow{6}{*}{Local (extreme uneven)} 
-			& Nearest & 22.334 & -27.119 & 16.170 & 0.339 \\
-			& Linear & 91.146 & -11.269 & 11.020 & 0.340 \\
-			& Cubic & 102.528 & -21.261 & 10.312 & 0.311 \\
-			& PINN  & 17.948 & -27.437 & 16.489 & 0.555 \\
-			& Diffusion  & $\boldsymbol{10.884}$ & $\boldsymbol{-29.913}$ & $\boldsymbol{18.965}$ & 0.784 \\
-			& PIDR-Net  & 11.114 & -29.866 & 18.917 & $\boldsymbol{0.794}$ \\
-			
+			& Nearest  & 22.335 & -27.119 & 16.171 & 0.340 \\
+			& Linear  & 91.147 & -21.969 & 11.020 & 0.340 \\
+			& Cubic  & 102.528 & -21.261 & 10.313 & 0.311 \\
+			& PINN  & 16.427 & -28.210 & 17.262 & 0.547 \\
+			& Diffusion  & 10.095 & -30.067 & 19.119 & 0.794 \\
+			& PIDR-Net  & $\boldsymbol{4.476}$ & $\boldsymbol{-34.582}$ & $\boldsymbol{23.633}$ & $\boldsymbol{0.884}$ \\
 			\bottomrule
 		\end{tabular}%
 	}
 \end{table}
 
-When the observations are spatially distributed, PIDR-Net gives the best results. Under random masking, it reduces the MSE from $1.588$ for diffusion and $2.596$ for PINN to $1.204$, corresponding to reductions of approximately $24.2\%$ and $53.6\%$, respectively. It also increases the SSIM from $0.929$ and $0.875$ to $0.954$. Under uniform masking, PIDR-Net again obtains the lowest MSE and NMSE and the highest PSNR and SSIM.
+PIDR-Net gives the best results under all three sampling strategies. Under random masking, it reduces the MSE from $1.559$ for diffusion and $2.455$ for PINN to $0.663$, corresponding to reductions of approximately $57.5\%$ and $73.0\%$, respectively. It also increases the SSIM from $0.929$ and $0.880$ to $0.978$. Under uniform masking, PIDR-Net again obtains the lowest MSE and NMSE and the highest PSNR and SSIM, reducing the MSE of diffusion from $1.715$ to $0.830$.
 
-Local masking is more difficult because most pilots lie in one region and the rest of the map must be extrapolated. Linear and cubic interpolation give MSE values of $91.146$ and $102.528$, respectively. The learned methods produce lower errors by using patterns learned from the training maps. Diffusion has the lowest MSE in this setting, whereas PIDR-Net has the highest SSIM ($0.794$). Thus, the refiner slightly increases pointwise error relative to diffusion but preserves more of the spatial structure measured by SSIM.
+Local masking is more difficult because most pilots lie in one region and the rest of the map must be extrapolated. Linear and cubic interpolation give MSE values of $91.147$ and $102.528$, respectively. The learned methods produce lower errors by using patterns learned from the training maps. PIDR-Net reduces the MSE of diffusion from $10.095$ to $4.476$ and raises the SSIM from $0.794$ to $0.884$. Far from the measured cluster the physics estimate has a large posterior variance, so the confidence channel indicates where the refiner should rely on the diffusion estimate, whereas near the cluster the plane wave model anchors the reconstruction to the measured field.
 
-Clustered measurements can arise from motion constraints, blocked sounding positions, or nonuniform probing trajectories. Under the local mask used here, PIDR-Net retains an SSIM of $0.794$, although its MSE is slightly higher than that of diffusion.
+Clustered measurements can arise from motion constraints, blocked sounding positions, or nonuniform probing trajectories. Under the local mask used here, PIDR-Net retains an SSIM of $0.884$ and the lowest MSE among all methods.
 
 \subsection{Impact of Different Masking Ratios}
 To further investigate the robustness of PIDR-Net with respect to measurement density, the missing ratio $\rho$ is varied while keeping the remaining evaluation protocol unchanged. Larger $\rho$ corresponds to fewer sounded grid positions and therefore higher online pilot saving.
 
-The results in Table~\ref{tab:mask_ratio_results} and Fig.~\ref{fig:masking_ratio} reveal a monotonic degradation as the measurement budget decreases, which is consistent with the increasing difficulty of the inverse problem. Nevertheless, PIDR-Net maintains high structural fidelity up to $\rho=0.9$, where only $10\%$ of the grid positions are observed and the SSIM remains $0.918$. The sharper degradation at $\rho=0.95$ indicates the transition to an extremely underdetermined regime, in which the reconstruction is dominated by the learned prior and only weakly anchored by online measurements.
+The results in Table~\ref{tab:mask_ratio_results} and Fig.~\ref{fig:masking_ratio} reveal a monotonic degradation as the measurement budget decreases, which is consistent with the increasing difficulty of the inverse problem. Nevertheless, PIDR-Net maintains high structural fidelity up to $\rho=0.9$, where only $10\%$ of the grid positions are observed and the SSIM remains $0.956$. At $\rho=0.95$, the MSE increases to $2.662$, indicating the transition to an extremely underdetermined regime in which the reconstruction relies more on the learned prior. Even with only $5\%$ of the grid observed, the SSIM remains $0.912$, because the field response physics prior still extracts the dominant plane wave components from the few measurements.
 
 \begin{table}[htbp]
 	\caption{PIDR-Net performance under different missing ratios.}
@@ -935,10 +914,10 @@ The results in Table~\ref{tab:mask_ratio_results} and Fig.~\ref{fig:masking_rati
 		\toprule
 		Missing Ratio $\rho$ & MSE & NMSE (dB) & PSNR (dB) & SSIM \\
 		\midrule
-		0.7 & 0.868 & -43.536 & 32.587 & 0.966 \\
-		0.8 & 1.231 & -41.638 & 30.689 & 0.954 \\
-		0.9 & 2.117 & -38.620 & 27.671 & 0.918 \\
-		0.95 & 9.076 & -30.827 & 19.879 & 0.605 \\
+		0.7 & 0.514 & -49.225 & 38.276 & 0.983 \\
+		0.8 & 0.638 & -46.590 & 35.642 & 0.977 \\
+		0.9 & 1.224 & -42.099 & 31.150 & 0.956 \\
+		0.95 & 2.662 & -37.809 & 26.860 & 0.912 \\
 		\bottomrule
 	\end{tabular}
 \end{table}
@@ -968,17 +947,17 @@ We evaluate PIDR-Net on the Sionna RT dataset under six available ratios, $\alph
 		\toprule
 		$\alpha$ & MSE & NMSE (dB) & SSIM \\
 		\midrule
-		0.1 & 7.523 & $-32.124$ & 0.710 \\
-		0.2 & 4.059 & -35.153 & 0.828 \\
-		0.3 & 2.364 & $-37.959$ & 0.906 \\
-		0.4 & 1.530 & $-40.079$ & 0.939 \\
-		0.5 & 1.269 & $-41.205$ & 0.953 \\
-		0.6 & 0.988 & $-42.308$ & 0.961 \\
+		0.1 & 5.448 & $-33.957$ & 0.786 \\
+		0.2 & 2.440 & $-38.141$ & 0.908 \\
+		0.3 & 1.327 & $-41.883$ & 0.948 \\
+		0.4 & 1.036 & $-43.599$ & 0.965 \\
+		0.5 & 0.786 & $-45.665$ & 0.973 \\
+		0.6 & 0.587 & $-47.403$ & 0.978 \\
 		\bottomrule
 	\end{tabular*}
 \end{table}
 
-Table~\ref{tab:semisup_rho} shows that reconstruction improves as the offline available ratio increases. At $\alpha=0.1$, the MSE is $7.523$ and the SSIM is $0.710$. At $\alpha=0.6$, the MSE decreases to $0.988$ and the SSIM increases to $0.961$. Because the test input density also grows with $\alpha$, the most direct comparison with complete training maps is $\alpha=0.4$, whose test inputs cover $20\%$ of the grid as in Table~\ref{tab:rt_main_results}. It reaches an MSE of $1.530$ and an SSIM of $0.939$, compared with $1.204$ and $0.955$ for full supervision, so sounding $40\%$ of the grid offline retains most of the accuracy obtained with complete training maps.
+Table~\ref{tab:semisup_rho} shows that reconstruction improves as the offline available ratio increases. At $\alpha=0.1$, the MSE is $5.448$ and the SSIM is $0.786$. At $\alpha=0.6$, the MSE decreases to $0.587$ and the SSIM increases to $0.978$. Because the test input density also grows with $\alpha$, the most direct comparison with complete training maps is $\alpha=0.4$, whose test inputs cover $20\%$ of the grid as in Table~\ref{tab:rt_main_results}. It reaches an MSE of $1.036$ and an SSIM of $0.965$, compared with $0.631$ and $0.978$ for full supervision, so sounding $40\%$ of the grid offline retains most of the accuracy obtained with complete training maps.
 
 Fig.~\ref{fig:semisup_heatmap} compares the reconstructed gain maps at different offline available ratios. Larger values of $\alpha$ produce sharper attenuation edges and more accurate deep fading valleys, while the model trained with $\alpha=0.1$ mainly recovers the broad spatial trend. The available ratio therefore controls the measured tradeoff between offline sounding cost and reconstruction error.
 
@@ -1054,7 +1033,7 @@ For the case with one user, two representative antenna configurations are consid
 	\label{fig:ma_singleuser_comparison}
 \end{figure*}
 
-The setting with multiple users is further evaluated on the Sionna RT, field response, and EM simulation datasets with $K=3$ users and $L=4$ movable antennas. The quantitative comparison is summarized in Table~\ref{tab:ma_multiuser_results}, and the corresponding visual results are shown in Fig.~\ref{fig:ma_multiuser_comparison}. Across the three datasets, PIDR based optimization consistently outperforms fixed random deployment in terms of sum spectral efficiency. On the Sionna RT and EM simulation datasets, the PIDR based rates are close to the GT based reference, indicating that the reconstructed maps preserve the dominant spatial structure across users. On the field response dataset, the PIDR based greedy selection obtains a slightly higher evaluated sum rate than the GT based greedy reference. This does not imply that PIDR surpasses complete CSI in a global optimization sense; rather, it reflects the heuristic nature of the greedy search subject to the spacing constraint and the fact that different CSI maps can induce different locally favorable search trajectories.
+The setting with multiple users is further evaluated on the Sionna RT, field response, and EM simulation datasets with $K=3$ users and $L=4$ movable antennas. The quantitative comparison is summarized in Table~\ref{tab:ma_multiuser_results}, and the corresponding visual results are shown in Fig.~\ref{fig:ma_multiuser_comparison}. Across the three datasets, PIDR based optimization consistently outperforms fixed random deployment in terms of sum spectral efficiency. On the field response and EM simulation datasets, the PIDR based sum rates are within $0.01$~bps/Hz of the GT based reference, and on the Sionna RT dataset the PIDR based rate reaches $93.9\%$ of the reference, indicating that the reconstructed maps preserve the dominant spatial structure across users. On the field response dataset, the PIDR based greedy selection even obtains a marginally higher evaluated sum rate than the GT based greedy reference ($9.705$ versus $9.702$~bps/Hz). This does not imply that PIDR surpasses complete CSI in a global optimization sense; rather, it reflects the heuristic nature of the greedy search subject to the spacing constraint, under which nearly identical CSI maps can induce slightly different search trajectories.
 
 \begin{table*}[t]
 	\caption{MA position optimization results for multiple users on three datasets.}
@@ -1068,17 +1047,17 @@ The setting with multiple users is further evaluated on the Sionna RT, field res
 		\midrule
 		\multirow{3}{*}{Sionna RT}
 		& GT based & 3.361 & 0.531 & -0.868 \\
-		& PIDR based & 2.956 & -0.138 & -1.274 \\
+		& PIDR based & 3.155 & 0.180 & -1.087 \\
 		& Fixed random & 2.348 & -1.440 & -1.805 \\
 		\midrule
 		\multirow{3}{*}{Field response}
 		& GT based & 9.702 & 9.226 & 7.476 \\
-		& PIDR based & 10.516 & 10.142 & 9.148 \\
+		& PIDR based & 9.705 & 9.238 & 7.850 \\
 		& Fixed random & 3.001 & -0.134 & -2.208 \\
 		\midrule
 		\multirow{3}{*}{EM simulation}
 		& GT based & 2.884 & -0.326 & -1.498 \\
-		& PIDR based & 2.765 & -0.557 & -1.611 \\
+		& PIDR based & 2.875 & -0.341 & -1.499 \\
 		& Fixed random & 2.255 & -1.670 & -2.211 \\
 		\bottomrule
 	\end{tabular}
@@ -1100,20 +1079,20 @@ The GT based optimizer uses the complete map as a reference and selects antenna 
 
 The fixed random deployment does not use the channel maps and gives lower rates in the reported experiments. The gap is larger in the tested case with more movable antennas, where position selection has more effect on the joint channel.
 
-The rate results show that the reconstructed maps retain information useful for MA position selection. Optimization using PIDR maps outperforms fixed random placement on all three datasets and approaches the GT based reference on the Sionna RT and EM simulation datasets.
+The rate results show that the reconstructed maps retain information useful for MA position selection. Optimization using PIDR maps outperforms fixed random placement on all three datasets and approaches the GT based reference on all three datasets.
 
 \FloatBarrier
 
 \subsection{Discussion}
 
-The experiments show three main patterns. First, diffusion gives lower errors than the standalone PINN when observations are sparse or locally concentrated. Second, refining the diffusion result improves most reconstruction metrics by using the coordinate and propagation inputs. Third, the position optimization results depend on the spatial ordering of candidate locations as well as the average reconstruction error.
+The experiments show three main patterns. First, diffusion gives lower errors than the standalone PINN when observations are sparse or locally concentrated. Second, refining the diffusion result with the field response physics prior improves the reconstruction metrics in every tested setting with distributed measurements. Third, the position optimization results depend on the spatial ordering of candidate locations as well as the average reconstruction error.
 
 PIDR-Net has two main limitations. It requires offline training maps that represent the deployment conditions, so an untested environment shift may reduce accuracy. Reverse diffusion also requires more inference steps than interpolation or a single pass regressor. Reduced step sampling or distillation could lower this cost in future work.
 
 \section{Conclusion}
 \label{sec:conclusion}
 
-This paper proposed PIDR-Net for reconstructing sparse complex CSI maps over a 2D MA movement region. Conditional diffusion first fills the unmeasured entries, and a compact PINN then corrects the estimate using coordinates and a learned propagation prior. Measured entries are retained, and the amplitude channel is kept consistent with the real and imaginary channels during reverse sampling. PIDR-Net achieves the best reported reconstruction metrics on the three evaluated datasets and under most tested sampling settings. Position optimization using the reconstructed maps also gives higher communication rates than fixed random antenna placement in the reported experiments.
+This paper proposed PIDR-Net for reconstructing sparse complex CSI maps over a 2D MA movement region. Conditional diffusion first fills the unmeasured entries, and a compact PINN then corrects the estimate using a field response physics prior, i.e., an LMMSE estimate from the measurements with a plane wave covariance derived from the diffusion output. Measured entries are retained, and the amplitude channel is kept consistent with the real and imaginary channels during reverse sampling. PIDR-Net achieves the best reported reconstruction metrics on the three evaluated datasets and under most tested sampling settings. Position optimization using the reconstructed maps also gives higher communication rates than fixed random antenna placement in the reported experiments.
 
 
 \bibliographystyle{IEEEtran}

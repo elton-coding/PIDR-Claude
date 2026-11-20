@@ -89,18 +89,19 @@ python -m scripts.train.train_pidr
 
 | 论文章节 | 脚本 | 结果目录 |
 |---|---|---|
-| Results on Sionna RT / Cross dataset comparison | `scripts/eval/benchmark_methods.py`（测试集） | `results/method_comparison_{sr,fd,el}/` |
-| Impact of different sampling strategies | `scripts/eval/benchmark_mask_strategies.py` | `results/mask_strategies_sr/` |
-| Impact of different masking ratios | `scripts/eval/benchmark_mask_ratios.py` | `results/mask_ratios_sr/` |
-| Impact of training measurement budget (α=0.1–0.6) | `scripts/train/train_pidr_semisupervised.py` + `scripts/eval/benchmark_semisupervised.py` | `results/semisupervised_sr/alpha_*/` |
-| MA position optimization, single user (L=4, 8) | `scripts/ma/generate_channel_maps.py` + `scripts/ma/ma_single_user.py` | `results/ma_single_user_sr/` |
-| MA position optimization, multi user (SR/FD/EL) | `scripts/ma/generate_channel_maps.py` + `scripts/ma/ma_multi_user.py` | `results/ma_multi_user/{sr,fd,el}/` |
+| Results on Sionna RT / Cross dataset comparison | `scripts/eval/benchmark_methods.py`（测试集） | `results/method_comparison_{sr,fd,el}_fr/` |
+| Impact of different sampling strategies | `scripts/eval/benchmark_mask_strategies.py` | `results/mask_strategies_sr_fr/` |
+| Impact of different masking ratios | `scripts/train/train_mask_ratio_refiners.py` + `scripts/eval/benchmark_mask_ratios.py` | `results/mask_ratios_sr_fr/` |
+| Impact of training measurement budget (α=0.1–0.6) | `scripts/train/train_semisup_refiners.py` + `scripts/eval/benchmark_semisupervised.py` | `results/semisupervised_sr_fr/alpha_*/` |
+| MA position optimization, single user (L=4, 8) | `scripts/ma/generate_channel_maps.py` + `scripts/ma/ma_single_user.py` | `results/ma_single_user_sr_fr/u0_L{4,8}/` |
+| MA position optimization, multi user (SR/FD/EL) | `scripts/ma/generate_channel_maps.py` + `scripts/ma/ma_multi_user.py` | `results/ma_multi_user_fr/{sr,fd,el}/` |
 | Refiner physics-module ablation (not in paper) | `scripts/train/train_refiner_ablation.py` + `scripts/eval/eval_refiner_ablation.py` | `results/refiner_ablation_v2_{sr,fd,el}/` |
 
-说明：主表已于 2026-11 按论文所述协议（测试集）重新评估，旧结果及其问题见 docs/checkpoints.md。
+说明：论文已于 2026-11 改用场响应 refiner，上述实验全部用新 refiner 重新训练、评估（`_fr` 目录，论文单位）；
+旧结果（无 `_fr` 后缀，数据单位）及其问题见 docs/checkpoints.md。
 各实验对应的权重及复核结论（包括 α=0.5 用错权重、FD 主表等问题）见 [docs/checkpoints.md](docs/checkpoints.md)。
 
-refiner 物理模块重设计（场响应 LMMSE，未写入论文；新训练默认使用）见 [docs/physics_refiner.md](docs/physics_refiner.md)。
+refiner 物理模块重设计（场响应 LMMSE，论文 PIDR-Net 现在使用的 refiner；消融未写入论文）见 [docs/physics_refiner.md](docs/physics_refiner.md)。
 
 最终模型（用于 MA 实验）的完整推理/评估命令见 [docs/run_commands.md](docs/run_commands.md)。
 

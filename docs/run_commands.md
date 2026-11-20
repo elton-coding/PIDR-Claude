@@ -314,6 +314,28 @@ python -m scripts.eval.evaluate_pidr `
   --output-dir .\results\eval\sr_train
 ```
 
+## Paper MA Maps (2026-11, field-response refiner)
+
+The paper's MA results use maps from the main PIDR-Net of each dataset
+(`checkpoints/<ds>/pidr/diffusion.pth` + the field-response refiner `checkpoints/<ds>/pidr/refiner.pth`).
+The per-dataset sections above document the older `final/` models (paper v13).
+
+```bash
+# d in sr fd el; normalization stats: sr -> data/sr.mat, fd -> data/field.mat, el -> data/el.mat
+PIDR_DATASET=$d python -m scripts.ma.generate_channel_maps --input data/test/$d.mat \
+  --output data/test/${d}_pidr_fr_batch.mat --heatmap-dir data/test/${d}_pidr_fr_heatmaps \
+  --metrics data/test/${d}_pidr_fr_metrics.csv \
+  --diffusion-ckpt checkpoints/$d/pidr/diffusion.pth --refiner-ckpt checkpoints/$d/pidr/refiner.pth \
+  --norm-stats-mat <stats .mat> --mask-ratio 0.8 --mask-strategy random --mask-seed 0 \
+  --diffusion-base-channels 64 --sample-stride 1
+PIDR_DATASET=$d python -m scripts.ma.ma_multi_user --gt-path data/test/$d.mat \
+  --pidr-path data/test/${d}_pidr_fr_batch.mat --n-antennas 4 --output-dir results/ma_multi_user_fr/$d
+# single user (paper figure: SR, user 0, L = 4 and 8)
+PIDR_DATASET=sr python -m scripts.ma.ma_single_user --gt-path data/test/sr.mat \
+  --pidr-path data/test/sr_pidr_fr_batch.mat --user-index 0 --n-antennas $L \
+  --output-dir results/ma_single_user_sr_fr/u0_L$L
+```
+
 ## Multi-User Movable Antenna Position Optimization
 
 This task uses `.\data\test\sr.mat` as the ground-truth multi-user channel map.

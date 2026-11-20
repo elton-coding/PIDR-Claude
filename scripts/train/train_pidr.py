@@ -419,7 +419,7 @@ def train_pinn_stage(
         diffusion_model=diffusion_model,
         diffusion_ckpt_path=diffusion_source_ckpt,
         device=device,
-        batch_size=Config.BATCH_SIZE,
+        batch_size=Config.PIDR.CACHE_BATCH_SIZE,
         sample_stride=sample_stride,
         force_rebuild=force_rebuild_cache,
     )
@@ -430,7 +430,7 @@ def train_pinn_stage(
         diffusion_model=diffusion_model,
         diffusion_ckpt_path=diffusion_source_ckpt,
         device=device,
-        batch_size=Config.BATCH_SIZE,
+        batch_size=Config.PIDR.CACHE_BATCH_SIZE,
         sample_stride=sample_stride,
         force_rebuild=force_rebuild_cache,
     )

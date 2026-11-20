@@ -337,10 +337,6 @@ def plot_three_way_comparison(
                 )
         ax.legend(loc="lower right", fontsize=9)
 
-    fig.suptitle(
-        f"Movable Antenna Position Optimization (N={n_antennas})",
-        fontsize=14, fontweight="bold",
-    )
     plt.tight_layout()
     plt.savefig(save_path, bbox_inches="tight", dpi=150)
     plt.close(fig)

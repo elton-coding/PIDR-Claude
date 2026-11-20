@@ -10,6 +10,9 @@ from torch.utils.data import Dataset
 
 from pidr.config import Config
 
+# The data store the gain as 10*log10|h|; the paper (eq. (2)) reports 10*log10|h|^2.
+GAIN_TO_PAPER_UNITS = 2.0
+
 try:
     import h5py
 except ImportError:
@@ -120,6 +123,10 @@ class CSIGridDataset(Dataset):
         c_max = self.global_max[channel_idx]
         rescaled = (np.asarray(channel_data, dtype=np.float32) + 1.0) / 2.0
         return rescaled * (c_max - c_min) + c_min
+
+    def gain_db(self, channel_data):
+        """Gain channel in the paper's units, 10*log10|h|^2 (the data store 10*log10|h|)."""
+        return self.inverse_normalize_channel(channel_data, 0) * GAIN_TO_PAPER_UNITS
 
     def generate_mask(self, valid_mask, strategy="random", sample_idx=None, observed_ratio=None):
         """根据指定策略为单个样本生成观测掩码。"""

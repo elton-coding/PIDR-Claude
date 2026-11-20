@@ -214,11 +214,14 @@ def apply_field_response(layer: FieldResponseLMMSE, estimates: torch.Tensor, mas
     return torch.cat(outs)
 
 
-def _gain_nmse_db(layer: FieldResponseLMMSE, pred_norm_gain: torch.Tensor, gt_norm_gain: torch.Tensor) -> float:
+def _gain_nmse_db(layer: FieldResponseLMMSE, pred_norm_gain: torch.Tensor, gt_norm_gain: torch.Tensor,
+                  weight: Optional[torch.Tensor] = None) -> float:
+    """Per-map gain NMSE (dB, averaged over maps); ``weight`` restricts it to a subset of positions."""
     lo, hi = float(layer.norm_min[0, 0, 0, 0]), float(layer.norm_max[0, 0, 0, 0])
     g = (gt_norm_gain.double() + 1) / 2 * (hi - lo) + lo
     p = (pred_norm_gain.double() + 1) / 2 * (hi - lo) + lo
-    err = ((g - p) ** 2).flatten(1).sum(1) / (g ** 2).flatten(1).sum(1).clamp_min(1e-30)
+    w = torch.ones_like(g) if weight is None else weight.double()
+    err = (w * (g - p) ** 2).flatten(1).sum(1) / (w * g ** 2).flatten(1).sum(1).clamp_min(1e-30)
     return float((10 * torch.log10(err.clamp_min(1e-30))).mean())
 
 
@@ -234,17 +237,21 @@ def calibrate_field_response(
     max_maps: int = 800,
     seed: int = 0,
     verbose: bool = True,
+    eval_mask: Optional[torch.Tensor] = None,
 ) -> dict:
     """Grid-search beta / nugget / iterations on (a subset of) the TRAINING maps by gain NMSE.
 
-    `estimates`, `masks`, `gt` are normalised training tensors. The best setting is written into the
-    layer and returned.
+    `estimates`, `masks`, `gt` are normalised training tensors. With ``eval_mask`` (N, 1, H, W) the
+    score only uses those positions (partial supervision: `gt` is then only valid there, e.g. held-out
+    supervision points). The best setting is written into the layer and returned.
     """
     n = estimates.shape[0]
     if n > max_maps:
         g = torch.Generator().manual_seed(seed)
         sel = torch.randperm(n, generator=g)[:max_maps].sort().values
         estimates, masks, gt = estimates[sel], masks[sel], gt[sel]
+        eval_mask = None if eval_mask is None else eval_mask[sel]
+    weight = None if eval_mask is None else eval_mask[:, 0]
     nmin, nmax = layer.norm_min.flatten().tolist(), layer.norm_max.flatten().tolist()
     best = None
     for it in iterations:
@@ -253,11 +260,11 @@ def calibrate_field_response(
                 configure_field_response(layer, nmin, nmax, beta=beta, nugget=nug, iterations=it)
                 out = apply_field_response(layer, estimates, masks)
                 gain = torch.where(masks[:, 0] > 0.5, gt[:, 0], out[:, 0])
-                score = _gain_nmse_db(layer, gain, gt[:, 0])
+                score = _gain_nmse_db(layer, gain, gt[:, 0], weight)
                 if verbose:
                     print(f"[FR-calib] iterations={it} beta={beta} nugget={nug:g}: gain NMSE {score:.3f} dB", flush=True)
                 if best is None or score < best["gain_nmse_db"]:
                     best = {"beta": beta, "nugget": nug, "iterations": it, "gain_nmse_db": score}
     configure_field_response(layer, nmin, nmax, beta=best["beta"], nugget=best["nugget"], iterations=best["iterations"])
-    best["input_gain_nmse_db"] = _gain_nmse_db(layer, estimates[:, 0], gt[:, 0])
+    best["input_gain_nmse_db"] = _gain_nmse_db(layer, estimates[:, 0], gt[:, 0], weight)
     return best

@@ -156,7 +156,6 @@ def plot_mask_ratio_heatmap(
         for col_idx, (plot_data, title) in enumerate(plots):
             draw_panel(axes[row_idx, col_idx], plot_data, title, vmin, vmax)
 
-    fig.suptitle(f"PIDR Mask Ratio Comparison (Sample {sample_id})", fontsize=14)
     plt.tight_layout()
     plt.savefig(save_path, bbox_inches="tight")
     plt.close(fig)
@@ -245,7 +244,7 @@ def run_pidr_mask_ratio_benchmark() -> None:
         sample_idx = int(dataset.indices[dataset_idx])
         gt_norm = dataset.gt_data[sample_idx].copy()
         valid_mask = dataset.valid_masks[sample_idx, 0].copy()
-        gt_phys = dataset.inverse_normalize_channel(gt_norm[0], 0)
+        gt_phys = dataset.gain_db(gt_norm[0])
         row_payloads: List[Dict[str, object]] = []
 
         for ratio_offset, experiment in enumerate(experiments):
@@ -274,11 +273,11 @@ def run_pidr_mask_ratio_benchmark() -> None:
                 if benchmark_cfg.ENFORCE_OBSERVED:
                     pidr_out = pidr_out * (1 - mask_tensor) + sparse_tensor * mask_tensor
 
-            sparse_phys = dataset.inverse_normalize_channel(sparse_norm[0], 0)
+            sparse_phys = dataset.gain_db(sparse_norm[0])
             sparse_display = sparse_phys.copy()
             sparse_display[mask_np < 0.5] = np.nan
 
-            pidr_phys = dataset.inverse_normalize_channel(pidr_out[0, 0].cpu().numpy(), 0)
+            pidr_phys = dataset.gain_db(pidr_out[0, 0].cpu().numpy())
             mse_val, nmse_db, psnr_val, ssim_val = calc_metrics(gt_phys, pidr_phys)
             observed_count = int(mask_np.sum())
 
@@ -337,4 +336,20 @@ def run_pidr_mask_ratio_benchmark() -> None:
 
 
 if __name__ == "__main__":
+    import argparse
+
+    cfg = Config.BENCHMARK.PIDR_MASK_RATIOS
+    parser = argparse.ArgumentParser(description="PIDR missing-ratio benchmark (defaults: Config.BENCHMARK.PIDR_MASK_RATIOS)")
+    parser.add_argument("--refiner-root", default=None,
+                        help="directory holding rho<ratio>/refiner.pth (e.g. runs/sr/mask_ratio_fr); default: curated checkpoints")
+    parser.add_argument("--output-dir", default=cfg.OUTPUT_DIR)
+    parser.add_argument("--num-eval-samples", type=int, default=cfg.NUM_EVAL_SAMPLES)
+    args = parser.parse_args()
+    cfg.OUTPUT_DIR = args.output_dir
+    cfg.NUM_EVAL_SAMPLES = args.num_eval_samples
+    if args.refiner_root:
+        for exp in cfg.EXPERIMENTS:
+            exp["pidr_refiner_checkpoint_candidates"] = [
+                os.path.join(args.refiner_root, f"rho{float(exp['mask_ratio']):.2f}", "refiner.pth")
+            ]
     run_pidr_mask_ratio_benchmark()

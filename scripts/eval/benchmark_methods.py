@@ -225,6 +225,7 @@ def apply_cli_overrides(args: argparse.Namespace) -> None:
         benchmark_cfg.SAMPLING_STRIDE = int(args.sample_stride)
     if args.num_eval_samples is not None:
         benchmark_cfg.NUM_EVAL_SAMPLES = int(args.num_eval_samples)
+    benchmark_cfg.ONLY_INDICES = args.only_indices
     if args.max_plots is not None:
         benchmark_cfg.MAX_PLOTS = int(args.max_plots)
     if args.plot_format:
@@ -320,14 +321,16 @@ def run_benchmark() -> None:
     records: List[Dict[str, float]] = []
     num_eval = min(num_eval_samples, len(dataset))
 
-    for idx in tqdm(range(num_eval), desc="Benchmark"):
+    only = getattr(benchmark_cfg, "ONLY_INDICES", None)
+    eval_indices = list(only) if only else list(range(num_eval))
+    for idx in tqdm(eval_indices, desc="Benchmark"):
         sample = dataset[idx]
         gt = sample["gt_csi"]
         sparse = sample["sparse_csi"]
         mask = sample["mask"]
 
-        gt_phys = dataset.inverse_normalize_channel(gt[0].numpy(), 0)
-        sparse_phys = dataset.inverse_normalize_channel(sparse[0].numpy(), 0)
+        gt_phys = dataset.gain_db(gt[0].numpy())
+        sparse_phys = dataset.gain_db(sparse[0].numpy())
         mask_np = mask[0].numpy()
 
         sparse_display = sparse_phys.copy()
@@ -354,9 +357,9 @@ def run_benchmark() -> None:
             if enforce_observed:
                 pidr_out = pidr_out * (1 - m_in) + s_in * m_in
 
-        diff_phys = dataset.inverse_normalize_channel(diff_out[0, 0].cpu().numpy(), 0)
-        pinn_phys = dataset.inverse_normalize_channel(pinn_out[0, 0].cpu().numpy(), 0)
-        pidr_phys = dataset.inverse_normalize_channel(pidr_out[0, 0].cpu().numpy(), 0)
+        diff_phys = dataset.gain_db(diff_out[0, 0].cpu().numpy())
+        pinn_phys = dataset.gain_db(pinn_out[0, 0].cpu().numpy())
+        pidr_phys = dataset.gain_db(pidr_out[0, 0].cpu().numpy())
 
         diff_mse, diff_nmse, diff_psnr, diff_ssim = calc_metrics(gt_phys, diff_phys)
         pinn_mse, pinn_nmse, pinn_psnr, pinn_ssim = calc_metrics(gt_phys, pinn_phys)
@@ -446,6 +449,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--interp-weight", type=float, default=0.0)
     parser.add_argument("--output-input-blend", type=float, default=0.0)
     parser.add_argument("--num-eval-samples", type=int, default=None)
+    parser.add_argument("--only-indices", type=int, nargs="+", default=None,
+                        help="evaluate (and plot) only these test-set positions, e.g. to regenerate paper figures")
     parser.add_argument("--max-plots", type=int, default=None)
     parser.add_argument("--plot-format", default=None)
     return parser

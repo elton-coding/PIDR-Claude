@@ -178,8 +178,8 @@ def run_benchmark() -> None:
         supervision_mask = sample["supervision_mask"]
         available_mask = sample["available_mask"]
 
-        gt_phys = base_dataset.inverse_normalize_channel(gt_norm[0], 0)
-        sparse_phys = base_dataset.inverse_normalize_channel(input_csi[0].numpy(), 0)
+        gt_phys = base_dataset.gain_db(gt_norm[0])
+        sparse_phys = base_dataset.gain_db(input_csi[0].numpy())
         sparse_display = sparse_phys.copy()
         sparse_display[input_mask[0].numpy() < 0.5] = np.nan
 
@@ -198,7 +198,7 @@ def run_benchmark() -> None:
             if benchmark_cfg.ENFORCE_OBSERVED:
                 pred = pred * (1 - input_mask_batch) + input_csi_batch * input_mask_batch
 
-        pred_phys = base_dataset.inverse_normalize_channel(pred[0, 0].cpu().numpy(), 0)
+        pred_phys = base_dataset.gain_db(pred[0, 0].cpu().numpy())
         error_map = np.abs(pred_phys - gt_phys)
         mse_val, nmse_db, ssim_val = calc_metrics(gt_phys, pred_phys)
 
@@ -264,4 +264,25 @@ def run_benchmark() -> None:
 
 
 if __name__ == "__main__":
+    import argparse
+
+    cfg = Config.BENCHMARK.PIDR_PARTIAL_SUPERVISION
+    parser = argparse.ArgumentParser(description="Semi-supervised PIDR benchmark (defaults: Config.BENCHMARK.PIDR_PARTIAL_SUPERVISION)")
+    parser.add_argument("--alpha", type=float, default=None, help="offline available ratio (default: config)")
+    parser.add_argument("--diffusion-ckpt", default=None, help="default: checkpoints/<ds>/semisup/alpha<a>/diffusion.pth")
+    parser.add_argument("--refiner-ckpt", default=None, help="default: checkpoints/<ds>/semisup/alpha<a>/refiner.pth")
+    parser.add_argument("--output-dir", default=None)
+    args = parser.parse_args()
+    if args.alpha is not None:
+        cfg.TOTAL_AVAILABLE_RATIO = args.alpha
+        tag = f"alpha{args.alpha:g}"
+        root = os.path.join(Config.PATHS.CHECKPOINT_DIR, Config.DATASET, "semisup", tag)
+        cfg.DIFFUSION_CHECKPOINT_CANDIDATES = [os.path.join(root, "diffusion.pth")]
+        cfg.REFINER_CHECKPOINT_CANDIDATES = [os.path.join(root, "refiner.pth")]
+    if args.diffusion_ckpt:
+        cfg.DIFFUSION_CHECKPOINT_CANDIDATES = [args.diffusion_ckpt]
+    if args.refiner_ckpt:
+        cfg.REFINER_CHECKPOINT_CANDIDATES = [args.refiner_ckpt]
+    if args.output_dir:
+        cfg.OUTPUT_DIR = args.output_dir
     run_benchmark()

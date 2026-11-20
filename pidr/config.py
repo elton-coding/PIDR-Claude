@@ -39,7 +39,8 @@ DATASET_PRESETS = {
         "learning_rate": 2e-4,
         "num_epochs": 1000,
         "force_rebuild_cache": False,
-        # Main-table PIDR-Net; pidr_cascade is the sampling-strategy model.
+        # PIDR-Net (diffusion + field-response refiner) for every paper experiment at 80% missing.
+        # pidr_cascade is the April cascade model used by the v13 sampling-strategy table.
         "pidr_dir": "pidr",
         "legacy_pidr_dir": "pidr_cascade",
     },
@@ -181,6 +182,8 @@ class _PIDRConfig:
 
     SAMPLE_STRIDE = 1
     PINN_TRAIN_MASK_SEED = 12345
+    # Batch size for building the diffusion-reconstruction cache (inference only; larger is faster).
+    CACHE_BATCH_SIZE = 256
     # Refiner variant (see pidr.models.pinn_refiner.PINNCSIReconstructor and docs/physics_refiner.md):
     # field-response LMMSE physics branch + coordinates, residual on the physics estimate.
     # The paper (v13) refiner was dict(prior="radial", use_coords=True, residual="none").
@@ -271,11 +274,11 @@ class _MaskStrategyBenchmarkConfig:
     SAMPLING_STRIDE = 1
     NUM_EVAL_SAMPLES = 50
 
-    # The paper's sampling-strategy table used the pidr_cascade model.
+    # The 2026-11 paper uses the main PIDR-Net (pidr/, field-response refiner); v13 used pidr_cascade.
     DIFFUSION_CHECKPOINT_CANDIDATES = [ckpt("baselines", "diffusion.pth")]
     PINN_CHECKPOINT_CANDIDATES = [ckpt("baselines", "pinn.pth")]
-    PIDR_DIFFUSION_CHECKPOINT_CANDIDATES = [ckpt("pidr_cascade", "diffusion.pth"), ckpt("pidr", "diffusion.pth")]
-    PIDR_REFINER_CHECKPOINT_CANDIDATES = [ckpt("pidr_cascade", "refiner.pth"), ckpt("pidr", "refiner.pth")]
+    PIDR_DIFFUSION_CHECKPOINT_CANDIDATES = [ckpt("pidr", "diffusion.pth"), ckpt("pidr_cascade", "diffusion.pth")]
+    PIDR_REFINER_CHECKPOINT_CANDIDATES = [ckpt("pidr", "refiner.pth"), ckpt("pidr_cascade", "refiner.pth")]
 
 
 class _PIDRMaskRatioBenchmarkConfig:
@@ -287,7 +290,7 @@ class _PIDRMaskRatioBenchmarkConfig:
     PLOT_FORMAT = "pdf"
 
     # mask_ratio is the missing ratio (as Config.MASK_RATIO). Weights live in
-    # checkpoints/<dataset>/mask_ratio/rho<ratio>/; note that the rho0.95 refiner was trained at 0.99.
+    # checkpoints/<dataset>/mask_ratio/rho<ratio>/ (FR refiners, 2026-11; each trained at its own ratio).
     EXPERIMENTS = [
         {
             "name": f"mr{round(ratio * 100)}",
