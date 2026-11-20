@@ -61,7 +61,7 @@
 \maketitle
 
 \begin{abstract}
-Movable antenna (MA) has attracted increasing attention in wireless communications due to its capability of wireless channel reconfiguration through local antenna movement within a confined region at the transmitter/receiver. However, to determine the optimal antenna positions, channel state information (CSI) within the entire region, termed small-scale channel map, is required, which poses a significant challenge due to the unaffordable overhead for exhaustive channel estimation at all positions. Unlike existing works assuming a theoretical channel model for channel map reconstruction, this paper investigates a data-driven approach based on practical channel models. Specifically, a physics informed diffusion refinement network, termed PIDR-Net, is proposed to reconstruct the channel map within a two-dimensional (2D) MA movement region from channel estimates at a small subset of positions. Specifically, PIDR-Net first reconstructs the unmeasured entries with a conditional denoising diffusion model. During reverse sampling, it restores the measured values after each step and periodically recomputes the amplitude channel from the real and imaginary channels. A compact refinement network then corrects the diffusion estimate using the observation mask, grid coordinates, and a field response physics prior, which re-estimates the channel map from the measurements by linear minimum mean squared error estimation with a plane wave covariance derived from the diffusion output. Extensive simulation results are provided to show the efficacy of our proposed PIDR-Net over other benchmark schemes under various practical channel models and also unveil the impacts of measurement antenna positions and budgets, on the overall performance
+Movable antenna (MA) has attracted increasing attention in wireless communications due to its capability of wireless channel reconfiguration through local antenna movement within a confined region at the transmitter/receiver. However, to determine the optimal antenna positions, channel state information (CSI) within the entire region, termed small-scale channel map, is required, which poses a significant challenge due to the unaffordable overhead for exhaustive channel estimation at all positions. Unlike existing works assuming a theoretical channel model for channel map reconstruction, this paper investigates a data-driven approach based on practical channel models. To this end, a physics informed diffusion refinement network, termed PIDR-Net, is proposed to reconstruct the channel map within a two-dimensional (2D) MA movement region from channel estimates at a small subset of positions. Specifically, PIDR-Net first reconstructs the unmeasured entries with a conditional denoising diffusion model. During reverse sampling, it restores the measured values after each step and periodically recomputes the amplitude channel from the real and imaginary channels. A compact refinement network then corrects the diffusion estimate using the observation mask, grid coordinates, and a field response physics prior, which re-estimates the channel map from the measurements by linear minimum mean squared error estimation with a plane wave covariance derived from the diffusion output. Extensive simulation results are provided to show the efficacy of our proposed PIDR-Net over other benchmark schemes under various practical channel models and also unveil the impacts of measurement antenna positions and budgets on the overall performance.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -121,12 +121,12 @@ where $h^{\mathrm{re}}(\vect{t})$ and $h^{\mathrm{im}}(\vect{t})$ denote its rea
     \label{eq:continuous_gain_t}
 \end{equation}
 
-To facilitate practical channel map construction, the continuous region ${\cal C}_t$ is discretized into $N\times N$ grids.. Each spatial dimension has $N$ uniformly spaced points, giving a sampling interval of
+To facilitate practical channel map construction, the continuous region $\mathcal{C}_{\mathrm t}$ is discretized into $N\times N$ grids. Each spatial dimension has $N$ uniformly spaced points, giving a sampling interval of
 \begin{equation}
     \Delta_{\mathrm t}=\frac{D_{\mathrm t}\lambda}{N-1}.
     \label{eq:grid_spacing}
 \end{equation}
-Let $\vect{t}_{u,v}\in\mathcal{C}_{\mathrm t}$ denote the position of grid point $(u,v)$-th sampling point, with $1\le u,v\le N$. Then, the resulting 2D channel map is
+Let $\vect{t}_{u,v}\in\mathcal{C}_{\mathrm t}$ denote the coordinate of the $(u,v)$-th sampling point, with $1\le u,v\le N$. Then, the resulting 2D channel map is
 \begin{equation}
     \mathcal{H}=\left\{h(\vect{t}_{u,v})\,\middle|\,1\le u,v\le N\right\}.
     \label{eq:channel_map_set}
@@ -152,7 +152,7 @@ The offline stage sends pilots from selected transmit MA positions to channel me
 
 During online operation, only a small subset of transmit MA positions is sounded for the current user. The resulting partial measurements are processed by the pretrained reconstruction model to infer the complete channel map. The reconstructed map supports antenna position selection for subsequent data transmission, while the limited sounding reduces online pilot overhead and MA movement.
 
-To this end, we define a binary input mask $\mat{M}^{I}\in\{0,1\}^{N\times N}$, where $M^{I}(u,v)=1$ if the CSI at $(u,v)$ is supplied to the reconstruction model and $0$ otherwise. During training, a separate binary mask $\mat{M}^{L}$ identifies the positions available as labels. Both masks are shared by the three CSI channels, but the label mask is not an input to the model. For a channel map $\mat{X}$, the input and label tensors are
+To this end, we define a binary input mask $\mat{M}^{I}\in\{0,1\}^{N\times N}$, where $M^{I}(u,v)=1$ if the CSI at $(u,v)$ is supplied to the reconstruction model and $0$ otherwise. During training, a separate binary mask $\mat{M}^{L}$ identifies the positions available as labels. Both masks are shared by the amplitude, real, and imaginary parts of the channel map, but the label mask is not an input to the model. For a channel map $\mat{X}$, the input and label tensors are
 \begin{equation}
     \mat{X}^{I}=\mat{X}\od\mat{M}^{I},\qquad
     \mat{X}^{L}=\mat{X}\od\mat{M}^{L},
@@ -186,12 +186,12 @@ Fig.~\ref{fig:offline_online_protocol} summarizes the proposed estimation protoc
 \section{Proposed PIDR-Net Algorithm for Channel Map Estimation}
 \label{sec:method}
 
-This section presents the architecture of our proposed PIDR-Net for channel map estimation which includes the conditional diffusion stage, the physics informed refinement stage, and their training and inference procedures.
+This section presents the architecture of our proposed PIDR-Net for channel map estimation, which includes the conditional diffusion stage, the physics informed refinement stage, and their training and inference procedures.
 
 \subsection{Offline Channel Measurements}
 \label{sec:offline_measurements}
 
-In an offline collection procedure, a single-antenna channel measurement device can be mounted on a mobile robot and placed successively at the locations in $\mathcal{R}_{\mathrm{off}}$. For each robot's measurement location $\vect{r}_s$, the device remains stationary while the BS sounds the selected grid points $\mathcal{A}_s\subseteq\Omega$.\footnote{As there are L transmit MAs, we can measure the channels for L MA training position each time.} The robot relocates the device between collection rounds.
+In an offline collection procedure, a single-antenna channel measurement device can be mounted on a mobile robot and placed successively at the locations in $\mathcal{R}_{\mathrm{off}}$. For each robot's measurement location $\vect{r}_s$, the device remains stationary while the BS sounds the selected grid points $\mathcal{A}_s\subseteq\Omega$.\footnote{As there are $L$ transmit MAs, the channels at $L$ training positions can be measured each time.} The robot relocates the device between collection rounds.
 
 At each $(u,v)\in\mathcal{A}_s$, the BS sends a pilot with its MA at $\vect{t}_{u,v}$, and the measurement device estimates the complex coefficient $h_s(\vect{t}_{u,v})$ for the link to $\vect{r}_s$. The measurements for this receiver location form one sample, and the offline measurement dataset can be written as
 \begin{equation}
@@ -204,7 +204,7 @@ Thus, $Q_s=|\mathcal{A}_s|$ MA positions are sounded for sample $s$, giving $\su
 
 \subsection{Data Processing}
 
-The amplitude, real parts, and imaginary parts generally have different numerical ranges and need to be normalized separately first. Let $\mathcal{C}_{\mathrm{ch}}=\{\mathrm a,\mathrm{re},\mathrm{im}\}$ denote the channel indices. The $S$ offline samples are divided into training and evaluation sets; $\mathcal{S}_{\mathrm{tr}}\subseteq\{1,\ldots,S\}$ contains the indices assigned to training. For each $s\in\mathcal{S}_{\mathrm{tr}}$, let $\mathcal{A}_{s,\mathrm{in}}\subseteq\mathcal{A}_s$ contain the measured grid points used as the model input; the corresponding mask satisfies $M_s^{I}(u,v)=1$ exactly when $(u,v)\in\mathcal{A}_{s,\mathrm{in}}$. The label mask $\mat{M}_s^{L}$ marks measured positions used for supervision. With complete measurements it covers the full grid; with partial measurements it marks only held-out positions in $\mathcal{A}_s$. For $c\in\mathcal{C}_{\mathrm{ch}}$, write $X_{s,c}(u,v)$ for the value in channel $c$ at a measured position $(u,v)\in\mathcal{A}_s$; in particular, $X_{s,\mathrm a}$, $X_{s,\mathrm{re}}$, and $X_{s,\mathrm{im}}$ correspond to the three components of $\mat{X}_s$. The channel extrema are calculated only from the training-input values:
+The amplitude, real parts, and imaginary parts of channel measurements generally have different numerical ranges and need to be normalized separately first. Let $\mathcal{C}_{\mathrm{ch}}=\{\mathrm a,\mathrm{re},\mathrm{im}\}$ denote the channel indices. The $S$ offline samples are divided into training and evaluation sets; $\mathcal{S}_{\mathrm{tr}}\subseteq\{1,\ldots,S\}$ contains the indices assigned to training. For each $s\in\mathcal{S}_{\mathrm{tr}}$, let $\mathcal{A}_{s,\mathrm{in}}\subseteq\mathcal{A}_s$ contain the measured grid points used as the model input; the corresponding mask satisfies $M_s^{I}(u,v)=1$ exactly when $(u,v)\in\mathcal{A}_{s,\mathrm{in}}$. The label mask $\mat{M}_s^{L}$ marks measured positions used for supervision. With complete measurements it covers the full grid; with partial measurements it marks only held-out positions in $\mathcal{A}_s$. For $c\in\mathcal{C}_{\mathrm{ch}}$, write $X_{s,c}(u,v)$ for the value in channel $c$ at a measured position $(u,v)\in\mathcal{A}_s$; in particular, $X_{s,\mathrm a}$, $X_{s,\mathrm{re}}$, and $X_{s,\mathrm{im}}$ correspond to the three components of $\mat{X}_s$. The channel extrema are calculated only from the training-input values:
 \begin{equation}
     \begin{aligned}
         x_c^{\min}
@@ -216,7 +216,7 @@ The amplitude, real parts, and imaginary parts generally have different numerica
     \end{aligned}
     \label{eq:normalization_extrema}
 \end{equation}
-where $\mathcal{A}_{s,\mathrm{in}}$ contains only valid measured positions used as input. Supervision-only positions, evaluation samples, and zero placeholders at unsounded positions do not affect the extrem. For the remainder of this section, we omit the sample index $s$ when describing one map. Each channel is normalized using these extrema:
+where $\mathcal{A}_{s,\mathrm{in}}$ contains only valid measured positions used as input. Supervision-only positions, evaluation samples, and zero placeholders at unsounded positions do not affect the extrema. For the remainder of this section, we omit the sample index $s$ when describing one map. Each channel is normalized using these extrema:
 \begin{equation}
     \widetilde{X}_c(u,v)=2\frac{X_c(u,v)-x_c^{\min}}{x_c^{\max}-x_c^{\min}}-1,
     \label{eq:normalization}
@@ -262,7 +262,7 @@ Finally, the two stages are combined by taking the refined output as the complet
     \widehat{\mat{X}}_{\mathrm n}=(\mat{1}-\mat{M}^{I})\od\widehat{\mat{X}}^{\mathrm{pinn}}+\mat{M}^{I}\od\widetilde{\mat{X}}^{I},
     \label{eq:final_estimator}
 \end{equation}
-where $\mat{1}\in\R^{N\times N}$ is the matrix of ones and both $\mat{1}$ and $\mat{M}^{I}$ are broadcast along the three channel components.
+where the subscript $\mathrm n$ indicates that the estimate is in the normalized domain, $\mat{1}\in\R^{N\times N}$ is the matrix of ones, and both $\mat{1}$ and $\mat{M}^{I}$ are applied to the three channel components.
 
 \subsection{Conditional Diffusion Stage}
 \begin{figure*}[t]
@@ -273,7 +273,7 @@ where $\mat{1}\in\R^{N\times N}$ is the matrix of ones and both $\mat{1}$ and $\
 	\label{fig:conditional_diffusion_stage}
 \end{figure*}
 
-As shown in Fig.~\ref{fig:conditional_diffusion_stage}, inference starts from $\mat{x}_{T}\sim\mathcal{N}(\mat{0},\mat{I})$ and repeats the reverse step for $t=T,T-1,\ldots,1$. At each step, the conditional U-Net takes $\mat{x}_t$, the normalized input map $\widetilde{\mat{X}}^{I}$, the input mask $\mat{M}^{I}$, and the time index $t$ to predict noise. If $t\in\mathcal{T}_{\mathrm{phy}}$, a clean map is estimated and converted to the original scale; its amplitude channel is recomputed from the real and imaginary channels, and the corrected map is normalized again before the input measurements are restored and the noise estimate is updated. Otherwise, the original noise prediction is used. Both branches feed the reverse update that produces $\mat{x}_{t-1}$ and restores the input measurements. After the last step, $\mat{x}_0$ is clipped to give the coarse reconstruction. Here, $\beta_t$ denotes the noise variance at step $t$, $\alpha_t=1-\beta_t$, and $\bar{\alpha}_t=\prod_{s=1}^{t}\alpha_s$. In the Gaussian notation, $\mat{0}\in\mathbb{R}^{3N^2}$ is the zero mean vector and $\mat{I}\in\mathbb{R}^{3N^2\times3N^2}$ is the identity covariance matrix; sampled vectors are reshaped to tensors of size $3\times N\times N$.
+As shown in Fig.~\ref{fig:conditional_diffusion_stage}, inference starts from $\mat{x}_{T}\sim\mathcal{N}(\mat{0},\mat{I})$ and repeats the reverse step for $t=T,T-1,\ldots,1$. At each step, the conditional U-Net takes $\mat{x}_t$, the normalized input map $\widetilde{\mat{X}}^{I}$, the input mask $\mat{M}^{I}$, and the time index $t$ to predict noise. If $t\in\mathcal{T}_{\mathrm{phy}}$, a clean map is estimated and converted to the original scale; its amplitude channel is recomputed from the real and imaginary channels, and the corrected map is normalized again before the input measurements are restored and the noise estimate is updated. Otherwise, the original noise prediction is used. Both branches feed the reverse update that produces $\mat{x}_{t-1}$ and restores the input measurements. After the last step, $\mat{x}_0$ is clipped to give the coarse reconstruction. Here, $\beta_t$ denotes the noise variance at step $t$, $\alpha_t=1-\beta_t$, and $\bar{\alpha}_t=\prod_{s=1}^{t}\alpha_s$.
 
 \subsubsection{Conditional denoising network}
 
@@ -340,7 +340,7 @@ Here, $\Down(\cdot)$ is a stride-2 convolutional downsampling operator, $\Up(\cd
     &= \mathrm{reshape}^{-1}\!\left(\mat{A}_1+\mathrm{FFN}(\mat{A}_1)\right),
     \label{eq:bottleneck_attention}
 \end{align}
-where $N'$ is the side length of the bottleneck feature grid, $\mathrm{reshape}(\cdot)$ converts a feature tensor of size $C\times N'\times N'$ into a sequence of $(N')^2$ feature vectors of dimension $C$, and $\mathrm{reshape}^{-1}(\cdot)$ restores the spatial arrangement. In addition, $\mathrm{MHA}(\cdot)$ denotes multi-head self-attention and $\mathrm{FFN}(\cdot)$ denotes its feedforward subnetwork. The decoder output is mapped to three noise channels by
+where $N'$ is the side length of the bottleneck feature grid, $\mathrm{reshape}(\cdot)$ converts a feature tensor of size $C\times N'\times N'$ into a sequence of $(N')^2$ feature vectors of dimension $C$, and $\mathrm{reshape}^{-1}(\cdot)$ restores the spatial arrangement. In addition, $\mathrm{MHA}(\cdot)$ denotes multi-head self-attention and $\mathrm{FFN}(\cdot)$ denotes its feedforward subnetwork. The output $\mat{B}_1=\Attn(\mat{B}_0)$ therefore has the same size $C\times N'\times N'$ as $\mat{B}_0$, and each of its spatial positions aggregates features from the whole bottleneck grid. The decoder output is mapped to three noise channels by
 \begin{align}
     \Head(\mat{D}_1)
     =
@@ -349,7 +349,7 @@ where $N'$ is the side length of the bottleneck feature grid, $\mathrm{reshape}(
     \right).
     \label{eq:diff_output_head}
 \end{align}
-Fig.~\ref{fig:conditional_diffusion_unet} shows the resulting network structure. Its labels $\widetilde{\mat{Y}}$ and $\mat{M}$ denote the normalized input $\widetilde{\mat{X}}^{I}$ and input mask $\mat{M}^{I}$ used here. These inputs enter every denoising step through the seven-channel input tensor, while the time embedding is added to all residual blocks. The detailed numerical hyperparameters are reported in Table~\ref{tab:exp_hparams}.
+Fig.~\ref{fig:conditional_diffusion_unet} shows the resulting network structure. The normalized input $\widetilde{\mat{X}}^{I}$ and the input mask $\mat{M}^{I}$ enter every denoising step through the seven-channel input tensor, while the time embedding is added to all residual blocks. The detailed numerical hyperparameters are reported in Table~\ref{tab:exp_hparams}.
 
 \begin{figure*}[t]
     \centering
@@ -375,11 +375,11 @@ For $t\in\mathcal{T}_{\mathrm{phy}}$, the predicted noise gives an estimate of t
     \right).
     \label{eq:x0_estimate}
 \end{equation}
-Here, $\operatorname{clip}_{[-1,1]}(\cdot)$ denotes entrywise clipping to the interval $[-1,1]$: for a scalar $a\in\mathbb{R}$, it returns $\min\{1,\max\{-1,a\}\}$. The clipping keeps the intermediate clean estimate within the normalized data range. The estimate is then converted to the original scale by \eqref{eq:inverse_normalization}, giving $\widehat{\mat{X}}^{\mathrm{phys}}_{0,t}=\big[\widehat{\mat{X}}^{\mathrm g}_{0,t},\widehat{\mat{X}}^{\mathrm{re}}_{0,t},\widehat{\mat{X}}^{\mathrm{im}}_{0,t}\big]$.
+Here, $\operatorname{clip}_{[-1,1]}(\cdot)$ denotes entrywise clipping to the interval $[-1,1]$: for a scalar $a\in\mathbb{R}$, it returns $\min\{1,\max\{-1,a\}\}$. The clipping keeps the intermediate clean estimate within the normalized data range. The estimate is then converted to the original scale by \eqref{eq:inverse_normalization}, giving $\widehat{\mat{X}}^{\mathrm{phys}}_{0,t}=\big[\widehat{\mat{X}}^{\mathrm a}_{0,t},\widehat{\mat{X}}^{\mathrm{re}}_{0,t},\widehat{\mat{X}}^{\mathrm{im}}_{0,t}\big]$.
 
 The next operation in the guided branch recomputes the amplitude channel from the real and imaginary channels at each grid location $(u,v)$:
 \begin{equation}
-    \widehat{X}^{\mathrm g}_{0,t}(u,v)=10\log_{10}\!\left(\big(\widehat{X}^{\mathrm{re}}_{0,t}(u,v)\big)^2+\big(\widehat{X}^{\mathrm{im}}_{0,t}(u,v)\big)^2\right),
+    \widehat{X}^{\mathrm a}_{0,t}(u,v)=10\log_{10}\!\left(\big(\widehat{X}^{\mathrm{re}}_{0,t}(u,v)\big)^2+\big(\widehat{X}^{\mathrm{im}}_{0,t}(u,v)\big)^2\right),
     \label{eq:physics_projection}
 \end{equation}
 where $\widehat{X}^{\mathrm{re}}_{0,t}(u,v)$ and $\widehat{X}^{\mathrm{im}}_{0,t}(u,v)$ are the components after inverse normalization. The corrected three-channel tensor is mapped back to normalized space by \eqref{eq:normalization}, yielding $\widehat{\mat{x}}^{\mathrm{phy}}_{0,t}$. To restore measured entries, define the observation consistency operator
@@ -387,7 +387,7 @@ where $\widehat{X}^{\mathrm{re}}_{0,t}(u,v)$ and $\widehat{X}^{\mathrm{im}}_{0,t
 	\Pi_{\mathrm{obs}}(\mat{Z})=(\mat{1}-\mat{M}^{I})\od\mat{Z}+\mat{M}^{I}\od\widetilde{\mat{X}}^{I},
 	\label{eq:obs_projection}
 \end{equation}
-where $\mat{Z}\in\mathbb{R}^{3\times N\times N}$ is any normalized intermediate map and $\mat{1}\in\R^{N\times N}$ is the matrix of ones. Both $\mat{1}$ and $\mat{M}^{I}$ are broadcast across the three channel components. The operator retains estimated values outside the input mask and replaces input entries with their measurements. Applying it to the corrected clean estimate gives the noise used for the reverse update:
+where $\mat{Z}\in\mathbb{R}^{3\times N\times N}$ is any normalized intermediate map and $\mat{1}\in\R^{N\times N}$ is the matrix of ones. Both $\mat{1}$ and $\mat{M}^{I}$ are applied to the three channel components. The operator retains estimated values outside the input mask and replaces input entries with their measurements. Applying it to the corrected clean estimate gives the noise used for the reverse update:
 \begin{equation}
     \widetilde{\vect{\epsilon}}_{\theta}
     =
@@ -731,7 +731,7 @@ Representative evaluation samples & up to $50$ \\
 \end{table}
 
 \subsubsection{Performance metrics}
-We report four reconstruction metrics on the gain channel. For compact notation, let $G=X^{\mathrm g}$ and $\widehat{G}=\widehat{X}^{\mathrm g}$.
+We report four reconstruction metrics on the gain channel. For compact notation, let $G=X^{\mathrm a}$ and $\widehat{G}=\widehat{X}^{\mathrm a}$.
 \begingroup
 \small
 \begin{align}
