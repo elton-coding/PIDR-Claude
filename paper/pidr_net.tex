@@ -88,7 +88,7 @@ The main contributions of this paper are summarized as follows.
     \item We formulate sparse complex CSI reconstruction for an MA system as a map completion problem with three channels on a 2D movement region, with observation masking, validity screening, and separate normalization of the amplitude, real, and imaginary components.
     \item We propose a conditional diffusion stage that reconstructs complete CSI maps by reverse sampling with exact restoration of measured values and periodic correction of the amplitude channel.
     \item We design a lightweight physics informed refinement stage built on a field response physics prior: the plane wave model of MA channels gives a covariance for LMMSE estimation from the measurements, and a reconstruction network with an encoder and decoder corrects this physics estimate.
-    \item We develop separate training  and inference procedures for the two stages, reuse diffusion estimates during refiner training, and evaluate PIDR-Net on RT and two additional datasets, multiple sampling strategies and measurement budgets, and MA position optimization.
+    \item We develop separate training and inference procedures for the two stages, reuse diffusion estimates during refiner training, and evaluate PIDR-Net on RT and two additional datasets, multiple sampling strategies and measurement budgets, and MA position optimization.
 \end{itemize}
 
 The remainder of this paper is organized as follows. Section~\ref{sec:problem} introduces the MA system model and hybrid estimation protocol. Section~\ref{sec:method} describes offline measurements, data processing, the two PIDR-Net stages, and their training and inference procedures. Section~\ref{sec:exp} reports the experimental setup and benchmark results on three datasets. Section~\ref{sec:conclusion} concludes the paper.
@@ -355,7 +355,7 @@ Fig.~\ref{fig:conditional_diffusion_unet} shows the resulting network structure.
     \centering
     \captionsetup{font=footnotesize}
     \includegraphics[width=0.98\textwidth]{figures/conditional_diffusion_unet_architecture.pdf}
-    \caption{Conditional diffusion U-Net used for noise prediction at reverse step $t$.}
+    \caption{\protect\centering Conditional diffusion U-Net used for noise prediction at time step $t$.}
     \label{fig:conditional_diffusion_unet}
 \end{figure*}
 
@@ -393,7 +393,7 @@ where $\mat{Z}\in\mathbb{R}^{3\times N\times N}$ is any normalized intermediate 
     =
     \frac{\mat{x}_t-\sqrt{\bar{\alpha}_t}\,
     \Pi_{\mathrm{obs}}(\widehat{\mat{x}}^{\mathrm{phy}}_{0,t})}
-    {\sqrt{1-\bar{\alpha}_t}},
+    {\sqrt{1-\bar{\alpha}_t}}.
     \label{eq:guided_noise_update}
 \end{equation}
 When $t\notin\mathcal{T}_{\mathrm{phy}}$, the clean estimate and amplitude correction are skipped, and $\widetilde{\vect{\epsilon}}_{\theta}=\widehat{\vect{\epsilon}}_{\theta}$. The experiments use $L_{\mathrm{phy}}=25$, as reported in Table~\ref{tab:exp_hparams}.
@@ -451,7 +451,7 @@ This objective follows standard denoising diffusion probabilistic learning and t
 
 \subsection{Physics Informed Refinement Stage}
 
-\subsubsection{Refinement Network interpretation}
+\subsubsection{Refinement network interpretation}
 
 Fig.~\ref{fig:pinn_refiner_arch} details the refinement stage. The upper branch is a field response physics prior. It uses the plane wave structure of the MA channel to estimate the complex channel map from the measured entries alone, with a spatial covariance obtained from the diffusion estimate, and it also returns the posterior variance of this estimate. The lower branch concatenates the physics estimate and its variance with the diffusion estimate, input mask, and coordinate tensor, and a compact encoder and decoder predicts a residual correction that is added to the physics estimate. Thus, \emph{physics informed refinement} here means that an explicit propagation model, the field response model, produces a physically consistent estimate that the network then corrects; no penalty term is imposed on the output.
 
@@ -521,7 +521,7 @@ Hence, the effective input dimensionality is ten channels. The refinement backbo
     =\operatorname{clip}_{[-1,1]}\!\left(\widehat{\mat{X}}^{\mathrm{fr}}+\mathcal{B}_{\phi}(\mat{Z}_{\mathrm{in}})\right),
     \label{eq:pinn_backbone_map}
 \end{equation}
-where $\mathcal{B}_{\phi}$ denotes the encoder and decoder. The output is the normalized refined map. The network uses two convolutional blocks at the input resolution, one stride 2 downsampling layer, a bottleneck block, bilinear upsampling, skip fusion, and a final linear projection.
+where $\mathcal{B}_{\phi}$ denotes the encoder and decoder. The output is the normalized refined map. The network uses two convolutional blocks at the input resolution, one stride-2 downsampling layer, a bottleneck block, bilinear upsampling, skip fusion, and a final linear projection.
 
 The refinement network thus consists of the physics prior in \eqref{eq:fr_lmmse} and a convolutional reconstruction network. The basic convolutional unit is
 \begin{equation}
@@ -617,7 +617,7 @@ The complete workflow is summarized by Algorithms~\ref{alg:offline_training} and
 \FOR{$t=T,T-1,\ldots,1$}
     \STATE Predict noise $\widehat{\vect{\epsilon}}_{\theta}=\mathcal{D}_{\theta}(\mat{x}_t,t,\widetilde{\mat{X}}^{I},\mat{M}^{I})$.
     \IF{$t\in\mathcal{T}_{\mathrm{phy}}$ as defined in \eqref{eq:physics_guidance_steps}}
-        \STATE Recover the clean estimate $\widehat{\mat{x}}_{0,t}$ using \eqref{eq:x0_estimate} and recompute its gain channel using \eqref{eq:physics_projection}.
+        \STATE Recover the clean estimate $\widehat{\mat{x}}_{0,t}$ using \eqref{eq:x0_estimate} and recompute its amplitude channel using \eqref{eq:physics_projection}.
         \STATE Apply \eqref{eq:obs_projection} to the corrected clean estimate and recompute $\widetilde{\vect{\epsilon}}_{\theta}$ using \eqref{eq:guided_noise_update}.
     \ELSE
         \STATE Set $\widetilde{\vect{\epsilon}}_{\theta}\leftarrow\widehat{\vect{\epsilon}}_{\theta}$.
@@ -669,7 +669,7 @@ All other components, including the network architectures, reverse sampling proc
 \section{Experimental Results}
 \label{sec:exp}
 
-This section reports six experiments: reconstruction on the main ray tracing dataset, comparison on two additional datasets, tests with different sampling geometries and online measurement ratios, training with different offline measurement ratios, and MA position optimization. The main dataset is generated with Sionna RT; the other two are obtained from field response and electromagnetic (EM) simulations.
+This section reports seven experiments: reconstruction on the main ray tracing dataset, comparison on two additional datasets, an ablation of the field response physics prior, tests with different sampling geometries and online measurement ratios, training with different offline measurement ratios, and MA position optimization. The main dataset is generated with Sionna RT; the other two are obtained from field response and electromagnetic (EM) simulations.
 
 \subsection{Datasets and Data Preparation}
 
@@ -768,8 +768,8 @@ Table~\ref{tab:rt_main_results} reports the results on the Sionna RT dataset. PI
 \toprule
 Method & MSE & NMSE (dB) & PSNR (dB) & SSIM \\
 \midrule
-Diffusion & 1.610 & -39.871 & 28.923 & 0.929 \\
-PINN & 2.455 & -37.143 & 26.195 & 0.880 \\
+Diffusion & 1.610 & $-39.871$ & 28.923 & 0.929 \\
+PINN & 2.455 & $-37.143$ & 26.195 & 0.880 \\
 PIDR-Net & $\boldsymbol{0.631}$ & $\boldsymbol{-46.672}$ & $\boldsymbol{35.723}$ & $\boldsymbol{0.978}$ \\
 \bottomrule
 \end{tabular}
@@ -793,16 +793,16 @@ The three learned methods are also trained and evaluated separately on the RT, f
 \toprule
 Dataset & Method & NMSE (dB) & PSNR (dB) & SSIM \\
 \midrule
-RT & Diffusion & -39.871 & 28.923 & 0.929 \\
-RT & PINN & -37.143 & 26.195 & 0.880 \\
+RT & Diffusion & $-39.871$ & 28.923 & 0.929 \\
+RT & PINN & $-37.143$ & 26.195 & 0.880 \\
 RT & PIDR-Net & $\boldsymbol{-46.672}$ & $\boldsymbol{35.723}$ & $\boldsymbol{0.978}$ \\
 \midrule
-Field response & Diffusion & -41.482 & 33.340 & 0.987 \\
-Field response & PINN & -37.477 & 29.335 & 0.970 \\
+Field response & Diffusion & $-41.482$ & 33.340 & 0.987 \\
+Field response & PINN & $-37.477$ & 29.335 & 0.970 \\
 Field response & PIDR-Net & $\boldsymbol{-47.710}$ & $\boldsymbol{39.568}$ & $\boldsymbol{0.998}$ \\
 \midrule
-EM simulation & Diffusion & -39.702 & 30.813 & 0.711 \\
-EM simulation & PINN & -41.569 & 32.680 & 0.865 \\
+EM simulation & Diffusion & $-39.702$ & 30.813 & 0.711 \\
+EM simulation & PINN & $-41.569$ & 32.680 & 0.865 \\
 EM simulation & PIDR-Net & $\boldsymbol{-61.255}$ & $\boldsymbol{52.366}$ & $\boldsymbol{0.998}$ \\
 
 \bottomrule
@@ -880,7 +880,7 @@ Dataset & Variant & NMSE (dB) & PSNR (dB) & SSIM \\
 	\label{fig:refiner_ablation}
 \end{figure}
 
-Table~\ref{tab:refiner_ablation} and Fig.~\ref{fig:refiner_ablation} show that the physics prior and the network are complementary. The physics prior alone already improves on the diffusion estimate, by $4.6$, $4.0$, and $13.5$~dB in NMSE on the three datasets, although it uses the diffusion output only through the covariance and has no trainable parameters. With the same network, adding the physics prior improves the NMSE from $-43.898$ to $-46.598$~dB on the RT dataset, from $-45.911$ to $-47.635$~dB on the field response dataset, and from $-49.651$ to $-61.094$~dB on the EM simulation dataset, i.e., by $2.7$, $1.7$, and $11.4$~dB. These differences are much larger than the variation over training seeds, which is at most $0.5$~dB, so the gain of the refinement stage comes from the physics prior rather than from the additional network capacity. On all test maps of each dataset, the refiner with the physics prior gives a lower MSE than the refiner without it on $80\%$--$91\%$ of the RT and field response maps and on $99\%$--$100\%$ of the EM simulation maps, depending on the training seed.
+Table~\ref{tab:refiner_ablation} and Fig.~\ref{fig:refiner_ablation} show that the physics prior and the network are complementary. The physics prior alone already improves on the diffusion estimate, by $4.6$, $4.0$, and $13.5$~dB in NMSE on the three datasets, although it uses the diffusion output only through the covariance and has no trainable parameters. With the same network, adding the physics prior improves the NMSE from $-43.898$ to $-46.598$~dB on the RT dataset, from $-45.911$ to $-47.635$~dB on the field response dataset, and from $-49.651$ to $-61.094$~dB on the EM simulation dataset, i.e., by $2.7$, $1.7$, and $11.4$~dB. These differences are much larger than the variation over training seeds, which is at most $0.5$~dB, so the gain of the refinement stage comes from the physics prior rather than from the additional network capacity. Over all test maps of each dataset, the refiner with the physics prior gives a lower MSE than the refiner without it for $80\%$--$91\%$ of the RT and field response maps and for $99\%$--$100\%$ of the EM simulation maps, depending on the training seed.
 
 The size of the gain is not determined by how well each dataset matches the plane wave model in \eqref{eq:field_response}, since all three datasets satisfy it; the field response dataset is in fact generated from \eqref{eq:field_response} with ten propagation paths. Instead, it depends on how fast the maps vary over the grid relative to the density of the measurements. The wavenumber spectrum of the EM simulation maps is concentrated at low spatial frequencies, so the maps vary smoothly, the plane wave covariance correlates distant grid points, and the LMMSE estimate from $20\%$ of the grid is already accurate: the physics prior alone outperforms the refiner without it by more than $4$~dB. The spectra of the RT and field response maps lie near the circle $\norm{\vect{k}}_2=k_0$, corresponding to spatial periods of about three and eight grid steps, respectively. These maps contain fine interference patterns and isolated deep fades, and the spectrum estimated for each map from the diffusion output on a $32\times32$ grid resolves the propagation directions only approximately. Here the network corrects the remaining errors, and the combination improves on either component alone by about $2$~dB.
 
@@ -913,27 +913,27 @@ The averaged quantitative results under the three masking strategies are reporte
 			Mask strategy & Method  & MSE & NMSE (dB) & PSNR (dB) & SSIM \\
 			\midrule
 			\multirow{6}{*}{Random} 
-			& Nearest  & 17.640 & -28.273 & 17.324 & 0.359 \\
-			& Linear  & 26.057 & -26.694 & 15.745 & 0.399 \\
-			& Cubic  & 31.019 & -25.892 & 14.943 & 0.359 \\
-			& PINN  & 2.455 & -37.143 & 26.195 & 0.880 \\
-			& Diffusion  & 1.559 & -39.820 & 28.871 & 0.929 \\
+			& Nearest  & 17.640 & $-28.273$ & 17.324 & 0.359 \\
+			& Linear  & 26.057 & $-26.694$ & 15.745 & 0.399 \\
+			& Cubic  & 31.019 & $-25.892$ & 14.943 & 0.359 \\
+			& PINN  & 2.455 & $-37.143$ & 26.195 & 0.880 \\
+			& Diffusion  & 1.559 & $-39.820$ & 28.871 & 0.929 \\
 			& PIDR-Net  & $\boldsymbol{0.663}$ & $\boldsymbol{-46.588}$ & $\boldsymbol{35.640}$ & $\boldsymbol{0.978}$ \\
 			\midrule
 			\multirow{6}{*}{Uniform} 
-			& Nearest  & 19.364 & -27.896 & 16.947 & 0.292 \\
-			& Linear  & 13.797 & -29.348 & 18.400 & 0.410 \\
-			& Cubic  & 15.545 & -28.863 & 17.914 & 0.374 \\
-			& PINN  & 3.608 & -35.217 & 24.268 & 0.807 \\
-			& Diffusion  & 1.715 & -39.433 & 28.484 & 0.920 \\
+			& Nearest  & 19.364 & $-27.896$ & 16.947 & 0.292 \\
+			& Linear  & 13.797 & $-29.348$ & 18.400 & 0.410 \\
+			& Cubic  & 15.545 & $-28.863$ & 17.914 & 0.374 \\
+			& PINN  & 3.608 & $-35.217$ & 24.268 & 0.807 \\
+			& Diffusion  & 1.715 & $-39.433$ & 28.484 & 0.920 \\
 			& PIDR-Net  & $\boldsymbol{0.830}$ & $\boldsymbol{-45.082}$ & $\boldsymbol{34.134}$ & $\boldsymbol{0.968}$ \\
 			\midrule
 			\multirow{6}{*}{Local (extreme uneven)} 
-			& Nearest  & 22.335 & -27.119 & 16.171 & 0.340 \\
-			& Linear  & 91.147 & -21.969 & 11.020 & 0.340 \\
-			& Cubic  & 102.528 & -21.261 & 10.313 & 0.311 \\
-			& PINN  & 16.427 & -28.210 & 17.262 & 0.547 \\
-			& Diffusion  & 10.095 & -30.067 & 19.119 & 0.794 \\
+			& Nearest  & 22.335 & $-27.119$ & 16.171 & 0.340 \\
+			& Linear  & 91.147 & $-21.969$ & 11.020 & 0.340 \\
+			& Cubic  & 102.528 & $-21.261$ & 10.313 & 0.311 \\
+			& PINN  & 16.427 & $-28.210$ & 17.262 & 0.547 \\
+			& Diffusion  & 10.095 & $-30.067$ & 19.119 & 0.794 \\
 			& PIDR-Net  & $\boldsymbol{4.476}$ & $\boldsymbol{-34.582}$ & $\boldsymbol{23.633}$ & $\boldsymbol{0.884}$ \\
 			\bottomrule
 		\end{tabular}%
@@ -959,10 +959,10 @@ The results in Table~\ref{tab:mask_ratio_results} and Fig.~\ref{fig:masking_rati
 		\toprule
 		Missing Ratio $\rho$ & MSE & NMSE (dB) & PSNR (dB) & SSIM \\
 		\midrule
-		0.7 & 0.514 & -49.225 & 38.276 & 0.983 \\
-		0.8 & 0.638 & -46.590 & 35.642 & 0.977 \\
-		0.9 & 1.224 & -42.099 & 31.150 & 0.956 \\
-		0.95 & 2.662 & -37.809 & 26.860 & 0.912 \\
+		0.7 & 0.514 & $-49.225$ & 38.276 & 0.983 \\
+		0.8 & 0.638 & $-46.590$ & 35.642 & 0.977 \\
+		0.9 & 1.224 & $-42.099$ & 31.150 & 0.956 \\
+		0.95 & 2.662 & $-37.809$ & 26.860 & 0.912 \\
 		\bottomrule
 	\end{tabular}
 \end{table}
@@ -1091,19 +1091,19 @@ The setting with multiple users is further evaluated on the Sionna RT, field res
 		Dataset & Method & Sum spectral efficiency (bps/Hz) & Mean SINR (dB) & Minimum SINR (dB) \\
 		\midrule
 		\multirow{3}{*}{Sionna RT}
-		& GT based & 3.361 & 0.531 & -0.868 \\
-		& PIDR based & 3.155 & 0.180 & -1.087 \\
-		& Fixed random & 2.348 & -1.440 & -1.805 \\
+		& GT based & 3.361 & 0.531 & $-0.868$ \\
+		& PIDR based & 3.155 & 0.180 & $-1.087$ \\
+		& Fixed random & 2.348 & $-1.440$ & $-1.805$ \\
 		\midrule
 		\multirow{3}{*}{Field response}
 		& GT based & 9.702 & 9.226 & 7.476 \\
 		& PIDR based & 9.705 & 9.238 & 7.850 \\
-		& Fixed random & 3.001 & -0.134 & -2.208 \\
+		& Fixed random & 3.001 & $-0.134$ & $-2.208$ \\
 		\midrule
 		\multirow{3}{*}{EM simulation}
-		& GT based & 2.884 & -0.326 & -1.498 \\
-		& PIDR based & 2.875 & -0.341 & -1.499 \\
-		& Fixed random & 2.255 & -1.670 & -2.211 \\
+		& GT based & 2.884 & $-0.326$ & $-1.498$ \\
+		& PIDR based & 2.875 & $-0.341$ & $-1.499$ \\
+		& Fixed random & 2.255 & $-1.670$ & $-2.211$ \\
 		\bottomrule
 	\end{tabular}
 \end{table*}
