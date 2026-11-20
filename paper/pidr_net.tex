@@ -51,7 +51,7 @@
 
 \begin{document}
 
-\title{PIDR-Net: A Physics Informed Diffusion Refinement Network for Channel Map Estimation in Movable Antenna Systems}
+\title{PIDR-Net: A Physics-Informed Diffusion Refinement Network for Channel Map Estimation in Movable Antenna Systems}
 
 \author{Authors}
 
@@ -61,7 +61,7 @@
 \maketitle
 
 \begin{abstract}
-Movable antenna (MA) has attracted increasing attention in wireless communications due to its capability of wireless channel reconfiguration through local antenna movement within a confined region at the transmitter/receiver. However, to determine the optimal antenna positions, channel state information (CSI) within the entire region, termed small-scale channel map, is required, which poses a significant challenge due to the unaffordable overhead for exhaustive channel estimation at all positions. Unlike existing works assuming a theoretical channel model for channel map reconstruction, this paper investigates a data-driven approach based on practical channel models. To this end, a physics informed diffusion refinement network, termed PIDR-Net, is proposed to reconstruct the channel map within a two-dimensional (2D) MA movement region from channel estimates at a small subset of positions. Specifically, PIDR-Net first reconstructs the unmeasured entries with a conditional denoising diffusion model. During reverse sampling, it restores the measured values after each step and periodically recomputes the amplitude channel from the real and imaginary channels. A compact refinement network then corrects the diffusion estimate using the observation mask, grid coordinates, and a field response physics prior, which re-estimates the channel map from the measurements by linear minimum mean squared error estimation with a plane wave covariance derived from the diffusion output. Extensive simulation results are provided to show the efficacy of our proposed PIDR-Net over other benchmark schemes under various practical channel models and also unveil the impacts of measurement antenna positions and budgets on the overall performance.
+Movable antenna (MA) has attracted increasing attention in wireless communications due to its capability of wireless channel reconfiguration through local antenna movement within a confined region at the transmitter/receiver. However, to determine the optimal antenna positions, channel state information (CSI) within the entire region, termed small-scale channel map, is required, which poses a significant challenge due to the unaffordable overhead for exhaustive channel estimation at all positions. Unlike existing works assuming a theoretical channel model for channel map reconstruction, this paper investigates a data-driven approach based on practical channel models. To this end, a physics-informed diffusion refinement network, termed PIDR-Net, is proposed to reconstruct the channel map within a two-dimensional (2D) MA movement region from channel estimates at a small subset of positions. Specifically, PIDR-Net first reconstructs the unmeasured entries with a conditional denoising diffusion model. During reverse sampling, it restores the measured values after each step and periodically recomputes the gain channel from the real and imaginary channels. A compact refinement network then corrects the diffusion estimate using the observation mask, grid coordinates, and a field response physics prior, which re-estimates the channel map from the measurements by linear minimum mean squared error estimation with a plane wave covariance derived from the diffusion output. Extensive simulation results are provided to show the efficacy of our proposed PIDR-Net over other benchmark schemes under various practical channel models and also unveil the impacts of measurement antenna positions and budgets on the overall performance.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -75,19 +75,19 @@ Increasing the number of antenna elements improves spatial multiplexing, beamfor
 
 Movable antenna (MA) technology offers one such method. An MA can move within a confined region and select a position with favorable propagation conditions \cite{ref_ma_opportunities,ref_ma_modeling}. Existing studies report gains in spectral efficiency, beam coverage, security, and performance for multiple users with fewer antenna elements than comparable architectures with fixed antennas \cite{ref_ma_multiuser,ref_ma_graph,ref_ma_spectrum,ref_ma_beam_coverage,ref_ma_security}. The resulting channel depends on the selected MA position, so position selection requires knowledge of the spatial channel variation within the movement region.
 
-Beamforming, user scheduling, antenna position selection, and movement planning depend on the CSI at both sounded and unsounded candidate positions. The transmitter therefore needs a local channel map over the small movement region \cite{ref_ma_modeling}. Measuring every candidate position requires pilot overhead proportional to the number of grid points and increases acquisition time. This paper reconstructs complex CSI rather than gain alone because the amplitude, real, and imaginary components are algebraically related and are all needed for antenna selection and coherent transmission.
+Beamforming, user scheduling, antenna position selection, and movement planning depend on the CSI at both sounded and unsounded candidate positions. The transmitter therefore needs a local channel map over the small movement region \cite{ref_ma_modeling}. Measuring every candidate position requires pilot overhead proportional to the number of grid points and increases acquisition time. This paper reconstructs complex CSI rather than the gain alone because the gain, real, and imaginary components are algebraically related and are all needed for antenna selection and coherent transmission.
 
 Existing MA channel estimation and mapping studies use compressed sensing \cite{ref_cs,ref_cs_framework}, Bayesian sparse reconstruction \cite{ref_sbar}, learning methods \cite{ref_agmae}, and tensor decomposition for MIMO MA systems \cite{ref_tensor}. Much of this work estimates a real valued gain map, whereas communication design may also require the real and imaginary components that contain the phase information. In addition, deterministic regressors trained from sparse inputs can lose accuracy when measurements are scarce, irregularly distributed, or confined to one part of the grid, where values outside the measured region must be extrapolated.
 
-Sparse MA channel map estimation must fill large unmeasured regions while preserving the relations among the three CSI channels. Denoising diffusion models can learn the distribution of complete maps and generate missing values conditioned on partial observations \cite{ref_ddpm}. After this initial estimate, the propagation model of MA channels and the algebraic channel relations can be used to correct local errors. Physics informed neural networks (PINNs) provide a way to include such information in a learned reconstruction model \cite{ref_pinn}. We therefore use diffusion for the initial map estimate and a PINN for the subsequent correction.
+Sparse MA channel map estimation must fill large unmeasured regions while preserving the relations among the three CSI channels. Denoising diffusion models can learn the distribution of complete maps and generate missing values conditioned on partial observations \cite{ref_ddpm}. After this initial estimate, the propagation model of MA channels and the algebraic channel relations can be used to correct local errors. Physics-informed neural networks (PINNs) provide a way to include such information in a learned reconstruction model \cite{ref_pinn}. We therefore use diffusion for the initial map estimate and a PINN for the subsequent correction.
 
-This paper studies sparse complex CSI map reconstruction over a 2D MA movement region and proposes PIDR-Net for this task. Its conditional diffusion stage estimates the complete map from sparse CSI observations. During reverse sampling, measured entries are restored after each step, and the amplitude channel is periodically recomputed from the real and imaginary channels. A compact PINN then refines the estimate using the diffusion output, observation mask, coordinate tensor, and a field response physics prior, which re-estimates the map from the measurements by LMMSE estimation with a plane wave covariance derived from the diffusion output. The two stages are trained separately and perform initial reconstruction followed by local correction.
+This paper studies sparse complex CSI map reconstruction over a 2D MA movement region and proposes PIDR-Net for this task. Its conditional diffusion stage estimates the complete map from sparse CSI observations. During reverse sampling, measured entries are restored after each step, and the gain channel is periodically recomputed from the real and imaginary channels. A compact PINN then refines the estimate using the diffusion output, observation mask, coordinate tensor, and a field response physics prior, which re-estimates the map from the measurements by LMMSE estimation with a plane wave covariance derived from the diffusion output. The two stages are trained separately and perform initial reconstruction followed by local correction.
 
 The main contributions of this paper are summarized as follows.
 \begin{itemize}
-    \item We formulate sparse complex CSI reconstruction for an MA system as a map completion problem with three channels on a 2D movement region, with observation masking, validity screening, and separate normalization of the amplitude, real, and imaginary components.
-    \item We propose a conditional diffusion stage that reconstructs complete CSI maps by reverse sampling with exact restoration of measured values and periodic correction of the amplitude channel.
-    \item We design a lightweight physics informed refinement stage built on a field response physics prior: the plane wave model of MA channels gives a covariance for LMMSE estimation from the measurements, and a reconstruction network with an encoder and decoder corrects this physics estimate.
+    \item We formulate sparse complex CSI reconstruction for an MA system as a map completion problem with three channels on a 2D movement region, with observation masking, validity screening, and separate normalization of the gain, real, and imaginary components.
+    \item We propose a conditional diffusion stage that reconstructs complete CSI maps by reverse sampling with exact restoration of measured values and periodic correction of the gain channel.
+    \item We design a lightweight physics-informed refinement stage built on a field response physics prior: the plane wave model of MA channels gives a covariance for LMMSE estimation from the measurements, and a reconstruction network with an encoder and decoder corrects this physics estimate.
     \item We develop separate training and inference procedures for the two stages, reuse diffusion estimates during refiner training, and evaluate PIDR-Net on RT and two additional datasets, multiple sampling strategies and measurement budgets, and MA position optimization.
 \end{itemize}
 
@@ -115,7 +115,7 @@ Let $\vect{t}\in\mathcal{C}_{\mathrm t}$ denote the MA's position. We suppress t
     h(\vect{t})=h^{\mathrm{re}}(\vect{t})+j h^{\mathrm{im}}(\vect{t}),
     \label{eq:continuous_channel_t}
 \end{equation}
-where $h^{\mathrm{re}}(\vect{t})$ and $h^{\mathrm{im}}(\vect{t})$ denote its real and imaginary parts, respectively. The corresponding channel amplitude in decibels (dB) is
+where $h^{\mathrm{re}}(\vect{t})$ and $h^{\mathrm{im}}(\vect{t})$ denote its real and imaginary parts, respectively. The corresponding channel gain in decibels (dB) is
 \begin{equation}
     g(\vect{t})=10\log_{10}\!\left(\big(h^{\mathrm{re}}(\vect{t})\big)^2+\big(h^{\mathrm{im}}(\vect{t})\big)^2\right),
     \label{eq:continuous_gain_t}
@@ -137,10 +137,10 @@ For learning and inference purposes, the channel map in \eqref{eq:channel_map_se
 \begin{equation}
     \mat{X}\in\R^{3\times N\times N},
     \qquad
-    \mat{X}=\big[\mat{X}^{\mathrm a},\mat{X}^{\mathrm{re}},\mat{X}^{\mathrm{im}}\big],
+    \mat{X}=\big[\mat{X}^{\mathrm g},\mat{X}^{\mathrm{re}},\mat{X}^{\mathrm{im}}\big],
     \label{eq:X_complete}
 \end{equation}
-where $\mat{X}^{\mathrm a}(u,v)=g(\vect{t}_{u,v})$, $\mat{X}^{\mathrm{re}}(u,v)=h^{\mathrm{re}}(\vect{t}_{u,v})$, and $\mat{X}^{\mathrm{im}}(u,v)=h^{\mathrm{im}}(\vect{t}_{u,v})$ for all $1\le u,v\le N$.
+where $\mat{X}^{\mathrm g}(u,v)=g(\vect{t}_{u,v})$, $\mat{X}^{\mathrm{re}}(u,v)=h^{\mathrm{re}}(\vect{t}_{u,v})$, and $\mat{X}^{\mathrm{im}}(u,v)=h^{\mathrm{im}}(\vect{t}_{u,v})$ for all $1\le u,v\le N$.
 
 For offline data collection, let $\mathcal{R}_{\mathrm{off}}=\{\vect{r}_s\mid 1\le s\le S\}$ denote a set of $S$ receiver locations in the deployment environment. The underlying channel map at $\vect{r}_s$ is denoted by $\mat{X}^{(s)}$, an instance of $\mat{X}$ in \eqref{eq:X_complete}. Its values are defined over the full grid, but only the positions in a measured set $\mathcal{A}_s\subseteq\Omega$, where $\Omega=\{1,\ldots,N\}\times\{1,\ldots,N\}$, are available in the offline sample. We denote the resulting measured tensor by $\mat{X}_s$: it contains the measured values on $\mathcal{A}_s$ and zeros at unsounded positions. Thus, $\mat{X}_s$ is a complete measured map only if $\mathcal{A}_s=\Omega$.
 
@@ -152,7 +152,7 @@ The offline stage sends pilots from selected transmit MA positions to channel me
 
 During online operation, only a small subset of transmit MA positions is sounded for the current user. The resulting partial measurements are processed by the pretrained reconstruction model to infer the complete channel map. The reconstructed map supports antenna position selection for subsequent data transmission, while the limited sounding reduces online pilot overhead and MA movement.
 
-To this end, we define a binary input mask $\mat{M}^{I}\in\{0,1\}^{N\times N}$, where $M^{I}(u,v)=1$ if the CSI at $(u,v)$ is supplied to the reconstruction model and $0$ otherwise. During training, a separate binary mask $\mat{M}^{L}$ identifies the positions available as labels. Both masks are shared by the amplitude, real, and imaginary parts of the channel map, but the label mask is not an input to the model. For a channel map $\mat{X}$, the input and label tensors are
+To this end, we define a binary input mask $\mat{M}^{I}\in\{0,1\}^{N\times N}$, where $M^{I}(u,v)=1$ if the CSI at $(u,v)$ is supplied to the reconstruction model and $0$ otherwise. During training, a separate binary mask $\mat{M}^{L}$ identifies the positions available as labels. Both masks are shared by the gain, real, and imaginary parts of the channel map, but the label mask is not an input to the model. For a channel map $\mat{X}$, the input and label tensors are
 \begin{equation}
     \mat{X}^{I}=\mat{X}\od\mat{M}^{I},\qquad
     \mat{X}^{L}=\mat{X}\od\mat{M}^{L},
@@ -167,7 +167,7 @@ The reconstruction task is to estimate the underlying channel map from the input
 \end{equation}
 where $\mathcal{F}$ is modeled by the proposed PIDR-Net in Section~\ref{sec:method}. The label pair $(\mat{X}^{L},\mat{M}^{L})$ is used only to evaluate training losses; it is not required during online reconstruction.
 
-Fig.~\ref{fig:offline_online_protocol} summarizes the proposed estimation protocol. The offline branch acquires channel measurements at different receiver locations, processes their amplitude, real part, and imaginary part, and uses them to train PIDR-Net. The online branch acquires measurements at selected MA positions to form $(\mat{X}^{I},\mat{M}^{I})$ and then applies the pretrained model to reconstruct the complete channel map.
+Fig.~\ref{fig:offline_online_protocol} summarizes the proposed estimation protocol. The offline branch acquires channel measurements at different receiver locations, processes their gain, real part, and imaginary part, and uses them to train PIDR-Net. The online branch acquires measurements at selected MA positions to form $(\mat{X}^{I},\mat{M}^{I})$ and then applies the pretrained model to reconstruct the complete channel map.
 
 \begin{figure}[t]
     \centering
@@ -186,7 +186,7 @@ Fig.~\ref{fig:offline_online_protocol} summarizes the proposed estimation protoc
 \section{Proposed PIDR-Net Algorithm for Channel Map Estimation}
 \label{sec:method}
 
-This section presents the architecture of our proposed PIDR-Net for channel map estimation, which includes the conditional diffusion stage, the physics informed refinement stage, and their training and inference procedures.
+This section presents the architecture of our proposed PIDR-Net for channel map estimation, which includes the conditional diffusion stage, the physics-informed refinement stage, and their training and inference procedures.
 
 \subsection{Offline Channel Measurements}
 \label{sec:offline_measurements}
@@ -200,11 +200,11 @@ At each $(u,v)\in\mathcal{A}_s$, the BS sends a pilot with its MA at $\vect{t}_{
     \{h_s(\vect{t}_{u,v})\}_{(u,v)\in\mathcal{A}_s}\right)\right\}_{s=1}^{S}.
     \label{eq:offline_measurement_set}
 \end{equation}
-Thus, $Q_s=|\mathcal{A}_s|$ MA positions are sounded for sample $s$, giving $\sum_{s=1}^{S}Q_s$ pointwise channel estimates in total. The real and imaginary parts of each estimate and its amplitude computed as in \eqref{eq:continuous_gain_t} provide the three aligned channel values at a measured grid point. When $\mathcal{A}_s=\Omega$, the measured tensor $\mat{X}_s$ has an entry at every grid position and can provide full supervision. When $\mathcal{A}_s\subsetneq\Omega$, $\mat{X}_s$ is incomplete: its measured positions can be divided into model inputs and training labels, but its zero placeholders outside $\mathcal{A}_s$ cannot serve as labels. The latter case is addressed by the semi-supervised procedure later in this section.
+Thus, $Q_s=|\mathcal{A}_s|$ MA positions are sounded for sample $s$, giving $\sum_{s=1}^{S}Q_s$ pointwise channel estimates in total. The real and imaginary parts of each estimate and its gain computed as in \eqref{eq:continuous_gain_t} provide the three aligned channel values at a measured grid point. When $\mathcal{A}_s=\Omega$, the measured tensor $\mat{X}_s$ has an entry at every grid position and can provide full supervision. When $\mathcal{A}_s\subsetneq\Omega$, $\mat{X}_s$ is incomplete: its measured positions can be divided into model inputs and training labels, but its zero placeholders outside $\mathcal{A}_s$ cannot serve as labels. The latter case is addressed by the semi-supervised procedure later in this section.
 
 \subsection{Data Processing}
 
-The amplitude, real parts, and imaginary parts of channel measurements generally have different numerical ranges and need to be normalized separately first. Let $\mathcal{C}_{\mathrm{ch}}=\{\mathrm a,\mathrm{re},\mathrm{im}\}$ denote the channel indices. The $S$ offline samples are divided into training and evaluation sets; $\mathcal{S}_{\mathrm{tr}}\subseteq\{1,\ldots,S\}$ contains the indices assigned to training. For each $s\in\mathcal{S}_{\mathrm{tr}}$, let $\mathcal{A}_{s,\mathrm{in}}\subseteq\mathcal{A}_s$ contain the measured grid points used as the model input; the corresponding mask satisfies $M_s^{I}(u,v)=1$ exactly when $(u,v)\in\mathcal{A}_{s,\mathrm{in}}$. The label mask $\mat{M}_s^{L}$ marks measured positions used for supervision. With complete measurements it covers the full grid; with partial measurements it marks only held-out positions in $\mathcal{A}_s$. For $c\in\mathcal{C}_{\mathrm{ch}}$, write $X_{s,c}(u,v)$ for the value in channel $c$ at a measured position $(u,v)\in\mathcal{A}_s$; in particular, $X_{s,\mathrm a}$, $X_{s,\mathrm{re}}$, and $X_{s,\mathrm{im}}$ correspond to the three components of $\mat{X}_s$. The channel extrema are calculated only from the training-input values:
+The gain, real parts, and imaginary parts of channel measurements generally have different numerical ranges and need to be normalized separately first. Let $\mathcal{C}_{\mathrm{ch}}=\{\mathrm g,\mathrm{re},\mathrm{im}\}$ denote the channel indices. The $S$ offline samples are divided into training and evaluation sets; $\mathcal{S}_{\mathrm{tr}}\subseteq\{1,\ldots,S\}$ contains the indices assigned to training. For each $s\in\mathcal{S}_{\mathrm{tr}}$, let $\mathcal{A}_{s,\mathrm{in}}\subseteq\mathcal{A}_s$ contain the measured grid points used as the model input; the corresponding mask satisfies $M_s^{I}(u,v)=1$ exactly when $(u,v)\in\mathcal{A}_{s,\mathrm{in}}$. The label mask $\mat{M}_s^{L}$ marks measured positions used for supervision. With complete measurements it covers the full grid; with partial measurements it marks only held-out positions in $\mathcal{A}_s$. For $c\in\mathcal{C}_{\mathrm{ch}}$, write $X_{s,c}(u,v)$ for the value in channel $c$ at a measured position $(u,v)\in\mathcal{A}_s$; in particular, $X_{s,\mathrm g}$, $X_{s,\mathrm{re}}$, and $X_{s,\mathrm{im}}$ correspond to the three components of $\mat{X}_s$. The channel extrema are calculated only from the training-input values:
 \begin{equation}
     \begin{aligned}
         x_c^{\min}
@@ -233,18 +233,18 @@ After normalizing measured entries, the input and label tensors are zero at posi
     \label{eq:normalized_input_label_maps}
 \end{equation}
 For a partially measured sample, $\widetilde{\mat{X}}$ in this expression is needed only on $\mathcal{A}_s$; unsounded zero placeholders are not normalized as channel values.
-Both the conditional diffusion network and the refinement network take normalized tensors as inputs and produce normalized outputs. Only the amplitude consistency operation in reverse diffusion uses the original channel values: the intermediate estimate is converted by \eqref{eq:inverse_normalization}, corrected algebraically, and normalized again by \eqref{eq:normalization}.
+Both the conditional diffusion network and the refinement network take normalized tensors as inputs and produce normalized outputs. Only the gain consistency operation in reverse diffusion uses the original channel values: the intermediate estimate is converted by \eqref{eq:inverse_normalization}, corrected algebraically, and normalized again by \eqref{eq:normalization}.
 
 \subsection{Architecture Overview}
 
-PIDR-Net combines a conditional diffusion model with a physics informed neural network (PINN) refiner. The diffusion stage estimates the unobserved channel coefficients by repeatedly denoising a random initial tensor conditioned on the sparse channel measurements and their mask. The PINN then refines the coarse estimate with the help of a field response physics estimate to reduce errors at individual grid points and disagreement among the three channels.
+PIDR-Net combines a conditional diffusion model with a physics-informed neural network (PINN) refiner. The diffusion stage estimates the unobserved channel coefficients by repeatedly denoising a random initial tensor conditioned on the sparse channel measurements and their mask. The PINN then refines the coarse estimate with the help of a field response physics estimate to reduce errors at individual grid points and disagreement among the three channels.
 
 The conditional diffusion stage learns the distribution of complete normalized channel maps conditioned on the normalized input $\widetilde{\mat{X}}^{I}$ and its mask $\mat{M}^{I}$. As illustrated in Fig.~\ref{fig:conditional_diffusion_stage}, it starts from Gaussian noise and applies conditional reverse diffusion to obtain the coarse normalized estimate
 \begin{equation}
     \widehat{\mat{X}}^{\mathrm{diff}}=\mathcal{G}_{\theta}(\widetilde{\mat{X}}^{I},\mat{M}^{I}),
     \label{eq:diff_stage}
 \end{equation}
-where $\widehat{\mat{X}}^{\mathrm{diff}}$ is the coarse channel map reconstructed in normalized space by the conditional diffusion mapping $\mathcal{G}_{\theta}$. The parameters $\theta$ collect the learnable weights of its time embedding, input projection, residual encoder and decoder, bottleneck self-attention, and output head that predicts noise. During reverse sampling, the measured entries are reinserted after every step, and the amplitude component is periodically recomputed from the real and imaginary components.
+where $\widehat{\mat{X}}^{\mathrm{diff}}$ is the coarse channel map reconstructed in normalized space by the conditional diffusion mapping $\mathcal{G}_{\theta}$. The parameters $\theta$ collect the learnable weights of its time embedding, input projection, residual encoder and decoder, bottleneck self-attention, and output head that predicts noise. During reverse sampling, the measured entries are reinserted after every step, and the gain component is periodically recomputed from the real and imaginary components.
 
 The PINN stage takes the coarse diffusion estimate and input mask and produces
 \begin{equation}
@@ -273,7 +273,7 @@ where the subscript $\mathrm n$ indicates that the estimate is in the normalized
 	\label{fig:conditional_diffusion_stage}
 \end{figure*}
 
-As shown in Fig.~\ref{fig:conditional_diffusion_stage}, inference starts from $\mat{x}_{T}\sim\mathcal{N}(\mat{0},\mat{I})$ and repeats the reverse step for $t=T,T-1,\ldots,1$. At each step, the conditional U-Net takes $\mat{x}_t$, the normalized input map $\widetilde{\mat{X}}^{I}$, the input mask $\mat{M}^{I}$, and the time index $t$ to predict noise. If $t\in\mathcal{T}_{\mathrm{phy}}$, a clean map is estimated and converted to the original scale; its amplitude channel is recomputed from the real and imaginary channels, and the corrected map is normalized again before the input measurements are restored and the noise estimate is updated. Otherwise, the original noise prediction is used. Both branches feed the reverse update that produces $\mat{x}_{t-1}$ and restores the input measurements. After the last step, $\mat{x}_0$ is clipped to give the coarse reconstruction. Here, $\beta_t$ denotes the noise variance at step $t$, $\alpha_t=1-\beta_t$, and $\bar{\alpha}_t=\prod_{s=1}^{t}\alpha_s$.
+As shown in Fig.~\ref{fig:conditional_diffusion_stage}, inference starts from $\mat{x}_{T}\sim\mathcal{N}(\mat{0},\mat{I})$ and repeats the reverse step for $t=T,T-1,\ldots,1$. At each step, the conditional U-Net takes $\mat{x}_t$, the normalized input map $\widetilde{\mat{X}}^{I}$, the input mask $\mat{M}^{I}$, and the time index $t$ to predict noise. If $t\in\mathcal{T}_{\mathrm{phy}}$, a clean map is estimated and converted to the original scale; its gain channel is recomputed from the real and imaginary channels, and the corrected map is normalized again before the input measurements are restored and the noise estimate is updated. Otherwise, the original noise prediction is used. Both branches feed the reverse update that produces $\mat{x}_{t-1}$ and restores the input measurements. After the last step, $\mat{x}_0$ is clipped to give the coarse reconstruction. Here, $\beta_t$ denotes the noise variance at step $t$, $\alpha_t=1-\beta_t$, and $\bar{\alpha}_t=\prod_{s=1}^{t}\alpha_s$.
 
 \subsubsection{Conditional denoising network}
 
@@ -375,11 +375,11 @@ For $t\in\mathcal{T}_{\mathrm{phy}}$, the predicted noise gives an estimate of t
     \right).
     \label{eq:x0_estimate}
 \end{equation}
-Here, $\operatorname{clip}_{[-1,1]}(\cdot)$ denotes entrywise clipping to the interval $[-1,1]$: for a scalar $a\in\mathbb{R}$, it returns $\min\{1,\max\{-1,a\}\}$. The clipping keeps the intermediate clean estimate within the normalized data range. The estimate is then converted to the original scale by \eqref{eq:inverse_normalization}, giving $\widehat{\mat{X}}^{\mathrm{phys}}_{0,t}=\big[\widehat{\mat{X}}^{\mathrm a}_{0,t},\widehat{\mat{X}}^{\mathrm{re}}_{0,t},\widehat{\mat{X}}^{\mathrm{im}}_{0,t}\big]$.
+Here, $\operatorname{clip}_{[-1,1]}(\cdot)$ denotes entrywise clipping to the interval $[-1,1]$: for a scalar $a\in\mathbb{R}$, it returns $\min\{1,\max\{-1,a\}\}$. The clipping keeps the intermediate clean estimate within the normalized data range. The estimate is then converted to the original scale by \eqref{eq:inverse_normalization}, giving $\widehat{\mat{X}}^{\mathrm{phys}}_{0,t}=\big[\widehat{\mat{X}}^{\mathrm g}_{0,t},\widehat{\mat{X}}^{\mathrm{re}}_{0,t},\widehat{\mat{X}}^{\mathrm{im}}_{0,t}\big]$.
 
-The next operation in the guided branch recomputes the amplitude channel from the real and imaginary channels at each grid location $(u,v)$:
+The next operation in the guided branch recomputes the gain channel from the real and imaginary channels at each grid location $(u,v)$:
 \begin{equation}
-    \widehat{X}^{\mathrm a}_{0,t}(u,v)=10\log_{10}\!\left(\big(\widehat{X}^{\mathrm{re}}_{0,t}(u,v)\big)^2+\big(\widehat{X}^{\mathrm{im}}_{0,t}(u,v)\big)^2\right),
+    \widehat{X}^{\mathrm g}_{0,t}(u,v)=10\log_{10}\!\left(\big(\widehat{X}^{\mathrm{re}}_{0,t}(u,v)\big)^2+\big(\widehat{X}^{\mathrm{im}}_{0,t}(u,v)\big)^2\right),
     \label{eq:physics_projection}
 \end{equation}
 where $\widehat{X}^{\mathrm{re}}_{0,t}(u,v)$ and $\widehat{X}^{\mathrm{im}}_{0,t}(u,v)$ are the components after inverse normalization. The corrected three-channel tensor is mapped back to normalized space by \eqref{eq:normalization}, yielding $\widehat{\mat{x}}^{\mathrm{phy}}_{0,t}$. To restore measured entries, define the observation consistency operator
@@ -396,7 +396,7 @@ where $\mat{Z}\in\mathbb{R}^{3\times N\times N}$ is any normalized intermediate 
     {\sqrt{1-\bar{\alpha}_t}}.
     \label{eq:guided_noise_update}
 \end{equation}
-When $t\notin\mathcal{T}_{\mathrm{phy}}$, the clean estimate and amplitude correction are skipped, and $\widetilde{\vect{\epsilon}}_{\theta}=\widehat{\vect{\epsilon}}_{\theta}$. The experiments use $L_{\mathrm{phy}}=25$, as reported in Table~\ref{tab:exp_hparams}.
+When $t\notin\mathcal{T}_{\mathrm{phy}}$, the clean estimate and gain correction are skipped, and $\widetilde{\vect{\epsilon}}_{\theta}=\widehat{\vect{\epsilon}}_{\theta}$. The experiments use $L_{\mathrm{phy}}=25$, as reported in Table~\ref{tab:exp_hparams}.
 
 Using the guided noise estimate, or the original prediction when guidance is skipped, the reverse mean and state update are
 \begin{align}
@@ -449,11 +449,11 @@ where $\lambda_{\mathrm{miss}}>1$ is the missing region weight. The diffusion lo
 \end{equation}
 This objective follows standard denoising diffusion probabilistic learning and trains the model in noise space rather than directly in CSI space. The physics projection and restoration of measured values are used during sampling and are not included in the diffusion training loss.
 
-\subsection{Physics Informed Refinement Stage}
+\subsection{Physics-Informed Refinement Stage}
 
 \subsubsection{Refinement network interpretation}
 
-Fig.~\ref{fig:pinn_refiner_arch} details the refinement stage. The upper branch is a field response physics prior. It uses the plane wave structure of the MA channel to estimate the complex channel map from the measured entries alone, with a spatial covariance obtained from the diffusion estimate, and it also returns the posterior variance of this estimate. The lower branch concatenates the physics estimate and its variance with the diffusion estimate, input mask, and coordinate tensor, and a compact encoder and decoder predicts a residual correction that is added to the physics estimate. Thus, \emph{physics informed refinement} here means that an explicit propagation model, the field response model, produces a physically consistent estimate that the network then corrects; no penalty term is imposed on the output.
+Fig.~\ref{fig:pinn_refiner_arch} details the refinement stage. The upper branch is a field response physics prior. It uses the plane wave structure of the MA channel to estimate the complex channel map from the measured entries alone, with a spatial covariance obtained from the diffusion estimate, and it also returns the posterior variance of this estimate. The lower branch concatenates the physics estimate and its variance with the diffusion estimate, input mask, and coordinate tensor, and a compact encoder and decoder predicts a residual correction that is added to the physics estimate. Thus, \emph{physics-informed refinement} here means that an explicit propagation model, the field response model, produces a physically consistent estimate that the network then corrects; no penalty term is imposed on the output.
 
 \begin{figure*}[t]
     \centering
@@ -498,7 +498,7 @@ where the padding ensures that every displacement within the grid is represented
 \end{align}
 where $\delta^{2}$ is a small regularization (nugget) term. The estimate in \eqref{eq:fr_lmmse} depends on the measurements only; the diffusion output enters only through the covariance. The estimation can be repeated $I_{\mathrm{fr}}$ times, with $\hat{h}^{\mathrm{fr}}$ replacing $\hat{h}^{\mathrm{diff}}$ in \eqref{eq:fr_spectrum}.
 
-The amplitude, real, and imaginary maps of $\hat{h}^{\mathrm{fr}}$ are computed as in \eqref{eq:continuous_gain_t} and normalized with the same extrema as the data, giving the physics estimate $\widehat{\mat{X}}^{\mathrm{fr}}\in\R^{3\times N\times N}$. The posterior variance is mapped to a confidence channel $\mat{V}(u,v)=\operatorname{clip}_{[-1,1]}\big(\log_{10}v(u,v)/3+1\big)$, which indicates where the physics estimate is reliable. The physics prior has no trainable parameters. Its hyperparameters $\kappa$, $\delta^{2}$, and $I_{\mathrm{fr}}$ are selected on the training split by a grid search over the gain NMSE of $\widehat{\mat{X}}^{\mathrm{fr}}$, and $\bar{\Psi}$ is computed from the training maps.
+The gain, real, and imaginary maps of $\hat{h}^{\mathrm{fr}}$ are computed as in \eqref{eq:continuous_gain_t} and normalized with the same extrema as the data, giving the physics estimate $\widehat{\mat{X}}^{\mathrm{fr}}\in\R^{3\times N\times N}$. The posterior variance is mapped to a confidence channel $\mat{V}(u,v)=\operatorname{clip}_{[-1,1]}\big(\log_{10}v(u,v)/3+1\big)$, which indicates where the physics estimate is reliable. The physics prior has no trainable parameters. Its hyperparameters $\kappa$, $\delta^{2}$, and $I_{\mathrm{fr}}$ are selected on the training split by a grid search over the gain NMSE of $\widehat{\mat{X}}^{\mathrm{fr}}$, and $\bar{\Psi}$ is computed from the training maps.
 
 Let the normalized coordinate tensor on the discrete spatial grid be denoted by
 \begin{equation}
@@ -589,7 +589,7 @@ The complete workflow is summarized by Algorithms~\ref{alg:offline_training} and
 \caption{Offline Training of the Two PIDR-Net Stages}
 \label{alg:offline_training}
 \begin{algorithmic}[1]
-\STATE Organize each fully measured sample $\mat{X}_s$ as aligned amplitude, real, and imaginary maps.
+\STATE Organize each fully measured sample $\mat{X}_s$ as aligned gain, real, and imaginary maps.
 \STATE Split the offline samples into training and evaluation sets, and select the input positions $\mathcal{A}_{s,\mathrm{in}}$ by random masking.
 \STATE Compute the channel extrema from these input positions by \eqref{eq:normalization_extrema}; normalize $\mat{X}_s$ and form $(\widetilde{\mat{X}},\widetilde{\mat{X}}^{I},\mat{M}^{I},\mat{M}^{L})$, with $\mat{M}^{L}=\mat{1}$.
 \FOR{each diffusion epoch}
@@ -617,7 +617,7 @@ The complete workflow is summarized by Algorithms~\ref{alg:offline_training} and
 \FOR{$t=T,T-1,\ldots,1$}
     \STATE Predict noise $\widehat{\vect{\epsilon}}_{\theta}=\mathcal{D}_{\theta}(\mat{x}_t,t,\widetilde{\mat{X}}^{I},\mat{M}^{I})$.
     \IF{$t\in\mathcal{T}_{\mathrm{phy}}$ as defined in \eqref{eq:physics_guidance_steps}}
-        \STATE Recover the clean estimate $\widehat{\mat{x}}_{0,t}$ using \eqref{eq:x0_estimate} and recompute its amplitude channel using \eqref{eq:physics_projection}.
+        \STATE Recover the clean estimate $\widehat{\mat{x}}_{0,t}$ using \eqref{eq:x0_estimate} and recompute its gain channel using \eqref{eq:physics_projection}.
         \STATE Apply \eqref{eq:obs_projection} to the corrected clean estimate and recompute $\widetilde{\vect{\epsilon}}_{\theta}$ using \eqref{eq:guided_noise_update}.
     \ELSE
         \STATE Set $\widetilde{\vect{\epsilon}}_{\theta}\leftarrow\widehat{\vect{\epsilon}}_{\theta}$.
@@ -684,9 +684,9 @@ Besides the dataset generated by RT, we also conduct experiments on a field resp
 \subsubsection{Compared methods}
 Three reconstruction strategies based on learning are compared.
 \begin{itemize}
-    \item \textit{Diffusion}: the conditional diffusion model alone, using physics informed reverse sampling and exact restoration of measured values;
-    \item \textit{PINN}: a standalone physics informed reconstruction network operating directly on the sparse input map and mask, with the same encoder and decoder, coordinate inputs, and learnable radial propagation features (a trainable propagation center, path loss exponent, and wave number);
-    \item \textit{PIDR-Net}: the proposed method, in which the diffusion model first produces a coarse completion and the physics informed refinement network subsequently improves local accuracy and consistency among channels.
+    \item \textit{Diffusion}: the conditional diffusion model alone, using physics-informed reverse sampling and exact restoration of measured values;
+    \item \textit{PINN}: a standalone physics-informed reconstruction network operating directly on the sparse input map and mask, with the same encoder and decoder, coordinate inputs, and learnable radial propagation features (a trainable propagation center, path loss exponent, and wave number);
+    \item \textit{PIDR-Net}: the proposed method, in which the diffusion model first produces a coarse completion and the physics-informed refinement network subsequently improves local accuracy and consistency among channels.
 \end{itemize}
 For the sampling strategy study, three classical interpolation baselines, namely nearest neighbor, linear, and cubic interpolation, are additionally included to quantify the benefit of learned priors under irregular observation geometries.
 
@@ -731,7 +731,7 @@ Representative evaluation samples & up to $50$ \\
 \end{table}
 
 \subsubsection{Performance metrics}
-We report four reconstruction metrics on the gain channel. For compact notation, let $G=X^{\mathrm a}$ and $\widehat{G}=\widehat{X}^{\mathrm a}$.
+We report four reconstruction metrics on the gain channel. For compact notation, let $G=X^{\mathrm g}$ and $\widehat{G}=\widehat{X}^{\mathrm g}$.
 \begingroup
 \small
 \begin{align}
@@ -1116,7 +1116,7 @@ The setting with multiple users is further evaluated on the Sionna RT, field res
 	\subfloat[Field response]{\includegraphics[width=0.32\textwidth]{figures/ma_multi_user_fd.pdf}}
 	\hfill
 	\subfloat[EM simulation]{\includegraphics[width=0.32\textwidth]{figures/ma_multi_user_el.pdf}}
-	\caption{\protect\centering MA position optimization results for multiple users on three datasets.}
+	\caption{\protect\centering Antenna positions selected for multiple users and the resulting SINR of each user on the three datasets.}
 	\label{fig:ma_multiuser_comparison}
 \end{figure*}
 
@@ -1137,7 +1137,7 @@ PIDR-Net has two main limitations. It requires offline training maps that repres
 \section{Conclusion}
 \label{sec:conclusion}
 
-This paper proposed PIDR-Net for reconstructing sparse complex CSI maps over a 2D MA movement region. Conditional diffusion first fills the unmeasured entries, and a compact PINN then corrects the estimate using a field response physics prior, i.e., an LMMSE estimate from the measurements with a plane wave covariance derived from the diffusion output. Measured entries are retained, and the amplitude channel is kept consistent with the real and imaginary channels during reverse sampling. PIDR-Net achieves the best reported reconstruction metrics on the three evaluated datasets and under all three tested sampling geometries. Position optimization using the reconstructed maps also gives higher communication rates than fixed random antenna placement and rates close to those obtained with complete CSI in the reported experiments.
+This paper proposed PIDR-Net for reconstructing sparse complex CSI maps over a 2D MA movement region. Conditional diffusion first fills the unmeasured entries, and a compact PINN then corrects the estimate using a field response physics prior, i.e., an LMMSE estimate from the measurements with a plane wave covariance derived from the diffusion output. Measured entries are retained, and the gain channel is kept consistent with the real and imaginary channels during reverse sampling. PIDR-Net achieves the best reported reconstruction metrics on the three evaluated datasets and under all three tested sampling geometries. Position optimization using the reconstructed maps also gives higher communication rates than fixed random antenna placement and rates close to those obtained with complete CSI in the reported experiments.
 
 
 \bibliographystyle{IEEEtran}

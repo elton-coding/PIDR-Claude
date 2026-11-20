@@ -35,6 +35,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.io import loadmat
 
+# The .mat maps store the gain as 10*log10|h|; the paper (eq. (2)) and all other figures use
+# 10*log10|h|^2. Plots show the paper's units (same constant as pidr.data.GAIN_TO_PAPER_UNITS).
+GAIN_TO_PAPER_UNITS = 2.0
+
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
@@ -298,6 +302,8 @@ def plot_three_way_comparison(
     """Generate a 3-panel comparison figure with antenna positions marked."""
     fig, axes = plt.subplots(1, 3, figsize=(18, 5.5))
 
+    gt_map = gt_map * GAIN_TO_PAPER_UNITS
+    pidr_map = pidr_map * GAIN_TO_PAPER_UNITS
     vmin = min(gt_map.min(), pidr_map.min())
     vmax = max(gt_map.max(), pidr_map.max())
 

@@ -38,6 +38,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.io import loadmat
 
+# The .mat maps store the gain as 10*log10|h|; the paper (eq. (2)) and all other figures use
+# 10*log10|h|^2. Plots show the paper's units (same constant as pidr.data.GAIN_TO_PAPER_UNITS).
+GAIN_TO_PAPER_UNITS = 2.0
+
 
 NOISE_POWER_DBM = -70
 NOISE_POWER_LINEAR = 10 ** ((NOISE_POWER_DBM - 30) / 10)
@@ -290,8 +294,8 @@ def plot_multiuser_comparison(
     axes = [fig.add_subplot(gs[0, i]) for i in range(3)]
     ax_bar = fig.add_subplot(gs[1, :])
 
-    gt_aggregate = np.mean(gt_gain, axis=0)
-    pidr_aggregate = np.mean(pidr_gain, axis=0)
+    gt_aggregate = np.mean(gt_gain, axis=0) * GAIN_TO_PAPER_UNITS
+    pidr_aggregate = np.mean(pidr_gain, axis=0) * GAIN_TO_PAPER_UNITS
     vmin = min(float(gt_aggregate.min()), float(pidr_aggregate.min()))
     vmax = max(float(gt_aggregate.max()), float(pidr_aggregate.max()))
 
