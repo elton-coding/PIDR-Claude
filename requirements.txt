@@ -10,3 +10,5 @@ scikit-image>=0.26
 tqdm>=4.67
 # Optional: only needed to read MATLAB v7.3 (HDF5) .mat files
 # h5py
+# Optional: only needed for the editable PowerPoint figure (paper/figures/draw_pinn_refiner.py)
+python-pptx>=1.0

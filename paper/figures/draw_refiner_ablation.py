@@ -61,10 +61,10 @@ ax.set_ylabel("NMSE reduction over diffusion (dB)")
 ax.set_ylim(0, 24)
 ax.yaxis.grid(True, color=GRID, linewidth=0.6, zorder=0)
 ax.set_axisbelow(True)
-for side in ("top", "right"):
-    ax.spines[side].set_visible(False)
-for side in ("left", "bottom"):
-    ax.spines[side].set_color(MUTED)
+for spine in ax.spines.values():  # full frame on all four sides
+    spine.set_visible(True)
+    spine.set_color(INK)
+    spine.set_linewidth(0.8)
 ax.tick_params(colors=INK, length=2.5)
 ax.legend(loc="upper left", frameon=False, fontsize=6.8, handlelength=1.2, handleheight=0.9)
 fig.tight_layout(pad=0.3)
