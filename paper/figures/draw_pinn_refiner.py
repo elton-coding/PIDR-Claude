@@ -304,7 +304,7 @@ def main() -> None:
     # ---------------- physics prior panel (top) ----------------
     px, py, pw, ph = 3.0, 8.05, 17.75, 4.35
     S.box(px, py, pw, ph, "", C["panel"], C["panel_edge"], lw=1.1, rounding=0.35, z=1)
-    S.text(px + 0.45, py + ph - 0.32, "Field Response Physics Prior (per map, no trainable parameters)",
+    S.text(px + 0.45, py + ph - 0.32, "Field Response Physics Prior",
            size=9.0, ha="left", bold=True)
 
     bh, by = 1.55, 9.55
