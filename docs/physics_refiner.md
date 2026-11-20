@@ -75,7 +75,7 @@
 ## 6. 结果
 
 所有数字：增益通道，论文单位（`10·log10|h|²`），NMSE/PSNR/SSIM 与单位无关。FR、NP 各 3 个训练 seed（0/1/2），
-表中为均值，± 为训练 seed 间标准差；PAPER 为论文当前 refiner（`checkpoints/<ds>/pidr/refiner.pth`），
+表中为均值，± 为训练 seed 间标准差；PAPER 为 v13 论文的径向先验 refiner（现存于 `checkpoints/archive/radial_v13/<ds>/pidr/refiner.pth`），
 在同一扩散输出上评估。每个 seed 都跑满 1000 epoch，最佳 epoch 的选法与论文协议一致。
 
 ### 6.1 消融（论文协议：前 50 张测试图，5 个扩散采样 seed）
@@ -84,32 +84,32 @@
 |---|---|---|---|---|---|
 | SR | 仅扩散 | 1.600 | −39.58 | 28.63 | 0.928 |
 | | 仅物理层（LMMSE，无网络） | 0.923 | −44.21 | 33.26 | 0.967 |
-| | 论文当前 refiner | 1.186 | −41.92 | 30.97 | 0.956 |
+| | v13 论文 refiner | 1.186 | −41.92 | 30.97 | 0.956 |
 | | NP：无物理模块 | 0.872 | −43.90 ± 0.04 | 32.95 | 0.969 |
 | | **FR：场响应物理模块** | **0.628** | **−46.60 ± 0.09** | **35.65** | **0.978** |
 | FD | 仅扩散 | 0.678 | −41.69 | 33.55 | 0.988 |
 | | 仅物理层 | 0.297 | −45.69 | 37.55 | 0.997 |
-| | 论文当前 refiner | 0.541 | −42.79 | 34.65 | 0.992 |
+| | v13 论文 refiner | 0.541 | −42.79 | 34.65 | 0.992 |
 | | NP | 0.279 | −45.91 ± 0.07 | 37.77 | 0.996 |
 | | **FR** | **0.182** | **−47.63 ± 0.03** | **39.49** | **0.998** |
 | EL | 仅扩散 | 0.0483 | −40.31 | 31.42 | 0.711 |
 | | 仅物理层 | 0.0050 | −53.79 | 44.90 | 0.994 |
-| | 论文当前 refiner | 0.0218 | −45.26 | 36.38 | 0.916 |
+| | v13 论文 refiner | 0.0218 | −45.26 | 36.38 | 0.916 |
 | | NP | 0.0078 | −49.65 ± 0.48 | 40.76 | 0.979 |
 | | **FR** | **0.0010** | **−61.09 ± 0.31** | **52.20** | **0.998** |
 
-论文当前 refiner 在此协议下的复现值（SR −41.92、FD −42.79、EL −45.26）与论文主表（−41.89、−42.67、−45.27）一致。
+v13 论文 refiner 在此协议下的复现值（SR −41.92、FD −42.79、EL −45.26）与 v13 论文主表（−41.89、−42.67、−45.27）一致。
 
 ### 6.2 全部测试图（SR/FD 1000 张，EL 97 张；5 个采样 seed）
 
-| 数据集 | 仅扩散 | 仅物理层 | 论文 refiner | NP | FR | 物理模块增益（FR − NP） | 相对论文 refiner |
+| 数据集 | 仅扩散 | 仅物理层 | v13 refiner | NP | FR | 物理模块增益（FR − NP） | 相对v13 refiner |
 |---|---|---|---|---|---|---|---|
 | SR | −39.94 | −44.09 | −42.10 | −44.13 ± 0.03 | **−46.57 ± 0.05** | **−2.44 dB** | −4.47 dB |
 | FD | −41.68 | −46.69 | −42.81 | −46.08 ± 0.11 | **−48.45 ± 0.02** | **−2.37 dB** | −5.64 dB |
 | EL | −39.53 | −53.67 | −44.94 | −48.83 ± 0.51 | **−60.85 ± 0.24** | **−12.02 dB** | −15.91 dB |
 
 逐图配对（缓存扩散输出，同一训练 seed）：FR 的 MSE 低于 NP 的比例为 SR 88.4–91.2%、FD 80.5–83.9%、
-EL 99.0–100%；低于论文 refiner 的比例为 SR 98.8%、FD 99.8%、EL 100%。
+EL 99.0–100%；低于v13 论文 refiner 的比例为 SR 98.8%、FD 99.8%、EL 100%。
 
 SR 上的其他变体（全部 1000 张，同一协议）：FR_coarse（物理模块作为输入、残差加在扩散估计上）−45.94；
 旧径向先验 A_full −42.01、B_no_prior −42.35、C_plain −41.98。物理模块即使只作为输入也有 +1.8 dB 增益，
@@ -145,7 +145,7 @@ SR 上的其他变体（全部 1000 张，同一协议）：FR_coarse（物理�
 PIDR_DATASET=sr python -m scripts.train.train_refiner_ablation --variants FR NP --seeds 0 1 2
 PIDR_DATASET=fd python -m scripts.train.train_refiner_ablation --variants FR NP --seeds 0 1 2 --diffusion-ckpt checkpoints/fd/baselines/diffusion.pth
 PIDR_DATASET=el python -m scripts.train.train_refiner_ablation --variants FR NP --seeds 0 1 2
-# 评估（runs/<ds>/ablation_refiner/PAPER/refiner.pth 为论文当前 refiner 的副本）
+# 评估（runs/<ds>/ablation_refiner/PAPER/refiner.pth 为 v13 论文 refiner 的副本）
 PIDR_DATASET=sr python -m scripts.eval.eval_refiner_ablation --variants FR NP FR_coarse PAPER --n 1000 --out-dir results/refiner_ablation_v2_sr
 PIDR_DATASET=sr python -m scripts.eval.eval_refiner_ablation --variants FR NP PAPER --n 50 --out-dir results/refiner_ablation_v2_sr/paper_protocol_n50
 # FD 评估另加 --diffusion-ckpt checkpoints/fd/baselines/diffusion.pth
