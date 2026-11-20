@@ -411,7 +411,6 @@ def main() -> None:
     ax_c = (15.75, mid)
     S.arrow((14.45 + col_w, mid), (ax_c[0] - 0.22, mid))
     S.circle(ax_c, 0.22, "+")
-    S.text(15.2, mid + 0.18, r"$\Delta$", size=7.6, va="bottom")
     S.line([ox + ts + 0.25, 17.6], [10.55 + ts / 2 - 0.25, 10.55 + ts / 2 - 0.25], color=C["muted"])
     S.line([17.6, 17.6], [10.55 + ts / 2 - 0.25, 7.45], color=C["muted"])
     S.line([15.75, 17.6], [7.45, 7.45], color=C["muted"])
@@ -433,8 +432,14 @@ def main() -> None:
     fig.savefig(REPO / "runs" / "pinn_refiner_architecture_preview.png", dpi=160, bbox_inches="tight")
     plt.close(fig)
     print("saved", OUT_DIR / "pinn_refiner_architecture.pdf")
-    to_pptx(S, OUT_DIR / "pinn_refiner_architecture.pptx")
-    print("saved", OUT_DIR / "pinn_refiner_architecture.pptx")
+    pptx_path = OUT_DIR / "pinn_refiner_architecture.pptx"
+    try:
+        to_pptx(S, pptx_path)
+    except PermissionError:  # the .pptx is open in PowerPoint: never overwrite hand edits
+        pptx_path = REPO / "runs" / "pinn_refiner_architecture.pptx"
+        to_pptx(S, pptx_path)
+        print("NOTE: paper/figures/pinn_refiner_architecture.pptx is open (locked); wrote the new version elsewhere")
+    print("saved", pptx_path)
 
 
 if __name__ == "__main__":
