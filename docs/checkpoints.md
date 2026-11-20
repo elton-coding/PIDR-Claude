@@ -123,7 +123,7 @@ checkpoints/
 
 论文中 PIDR-Net 的 refiner 已从 v13 的径向传播先验（`prior="radial"`）换成场响应 LMMSE 物理先验
 （`prior="field_response"`, `residual="physics"`，设计与消融见 [physics_refiner.md](physics_refiner.md)；
-消融本身未写入论文）。方法章节、refiner 结构图（`paper/figures/draw_pinn_refiner.py`）、超参数表
+消融在论文 Sec. V-E：表 IV、图 9，数据取自 `results/refiner_ablation_v2_<ds>/paper_protocol_n50/`）。方法章节、refiner 结构图（`paper/figures/draw_pinn_refiner.py`）、超参数表
 （κ / δ² / I_fr：SR 1.0/1e-4/1，FD 1.0/1e-4/2，EL 0.9/1e-4/2）随之改写。扩散模型均未重新训练，
 只重新训练 refiner，然后重跑全部实验；新结果都优于或接近原论文，因此全部替换。
 
@@ -150,7 +150,7 @@ checkpoints/
   MSE 不需要再乘 4；`results/*_fr/` 中的数值都是论文单位。旧结果目录（无 `_fr` 后缀）仍是数据单位。
 - 最佳 epoch 仍按测试集 missing-MSE 选取（与 v13 协议相同，问题 9）。
 
-## Refiner 物理先验消融（SR，2026-11，未写入论文）
+## Refiner 径向先验消融（SR，2026-11，未写入论文）
 
 问题：refiner 输入端的可学习传播先验（`PropagationPrior`：路径损耗幅度 + `cos/sin(k·d)` 相位，
 3 通道）是否有用？三个变体只改输入通道，其余完全相同（同一冻结扩散模型 `sr/pidr/diffusion.pth`、

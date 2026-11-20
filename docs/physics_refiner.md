@@ -129,7 +129,8 @@ SR 上的其他变体（全部 1000 张，同一协议）：FR_coarse（物理�
   并且新 refiner 在三个数据集上都显著优于 v13 论文结果（4.5 / 5.6 / 15.9 dB）。
 - 收益来源：物理层是逐图的、只依赖测量值的线性估计，与扩散模型的误差互补；网络只需学习物理估计的残差。
   EL 的场最平滑，平面波协方差最准确，收益最大。
-- 2026-11 论文已改用 FR refiner（方法章节、结构图与全部实验结果；消融本身未写入论文），权重已复制到论文使用的目录
+- 2026-11 论文已改用 FR refiner（方法章节、结构图与全部实验结果）；6.1 的消融（仅扩散 / 仅物理层 / NP / FR）作为表 IV 和图 9 写入论文 Sec. V-E，
+  图由 `paper/figures/draw_refiner_ablation.py` 生成，权重已复制到论文使用的目录
   （`<ds>/pidr/`、`sr/mask_ratio/rho*/`、`sr/semisup/alpha*/`），新旧数值对照见 [checkpoints.md](checkpoints.md)。
 - 最佳 epoch 仍按测试集 missing-MSE 选取（与论文主表协议相同）；FR 与 NP 使用完全相同的选法，所以消融对比是公平的。
 
